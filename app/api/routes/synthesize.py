@@ -16,6 +16,7 @@ Emotion refinement:
     grief, frustration, rage, anxiety) runs after classification.
 """
 import os
+import re
 from fastapi import APIRouter, HTTPException
 
 from app.api.schemas.request import SynthesizeRequest
@@ -31,6 +32,7 @@ from app.services.emotion.intensity import calculate_prosody
 from app.services.emotion.sentence_analysis import (
     analyze_text, build_emotion_breakdown, split_sentences
 )
+from app.services.text.text_enhancer import enhance_text
 from app.services.tts.ssml_builder import SSMLBuilder
 from app.services.tts.elevenlabs_tts import ElevenLabsTTS
 from app.services.tts.google_tts import GoogleCloudTTS
@@ -38,6 +40,7 @@ from app.services.tts.expressive_edge_tts import ExpressiveEdgeTTS
 from app.services.tts.edge_tts_engine import EdgeTTSEngine
 from app.services.tts.fallback_tts import FallbackTTS
 from app.services.audio.storage import AudioStorageService
+from app.services.audio.post_processor import process_audio
 
 router = APIRouter()
 
@@ -195,11 +198,22 @@ async def synthesize_speech(request: SynthesizeRequest):
                 f"emotions: {unique_emotions}"
             )
 
-        # Step 7 — SSML generation
-        engine_ssml  = _ssml_builder.build_ssml_engine(clean_text)
-        display_ssml = _ssml_builder.build_ssml_display(clean_text, prosody)
+        # Step 7 — Text Enhancement (punctuation injection + chunking)
+        enhanced_text = enhance_text(clean_text, emotion_label, request.intensity)
+        # TTS-safe text: convert ||Xms|| pause markers to a natural pause.
+        # If a marker follows punctuation (.!?) → just a space (punctuation gives the pause).
+        # If a marker follows a word → insert a comma (light breath pause).
+        tts_text = re.sub(r"(?<=[.!?,])\s*\|\|\d+ms\|\|\s*", " ", enhanced_text)
+        tts_text = re.sub(r"\|\|\d+ms\|\|", ", ", tts_text).strip()
+        logger.info(
+            f"Text enhanced: {len(clean_text)}→{len(tts_text)} chars"
+        )
 
-        # Step 8 — Cache key (prosody + emotion breakdown)
+        # Step 8 — SSML generation (now emotion-aware)
+        engine_ssml  = _ssml_builder.build_ssml_engine(enhanced_text, prosody, emotion_label)
+        display_ssml = _ssml_builder.build_ssml_display(enhanced_text, prosody, emotion_label)
+
+        # Step 9 — Cache key (prosody + emotion breakdown)
         filename = _storage.generate_filename(
             clean_text, emotion_label, request.intensity,
             prosody=prosody, extension="mp3",
@@ -210,11 +224,15 @@ async def synthesize_speech(request: SynthesizeRequest):
             final_path = base_filepath
             logger.info(f"Cache hit: {filename}")
         else:
-            # Step 9 — Synthesize
+            # Step 10 — Synthesize (use enhanced tts_text for expressiveness)
             final_path = await _synthesize_audio(
-                clean_text, engine_ssml, base_filepath, prosody, emotion_label
+                tts_text, engine_ssml, base_filepath, prosody, emotion_label
             )
             logger.info(f"Audio saved: {final_path}")
+
+            # Step 11 — Post-processing (EQ, reverb, compression)
+            final_path = process_audio(final_path, emotion_label, request.intensity)
+            logger.info(f"Post-processing complete: {final_path}")
 
         final_filename = os.path.basename(final_path)
         audio_url = f"/api/v1/audio/{final_filename}"

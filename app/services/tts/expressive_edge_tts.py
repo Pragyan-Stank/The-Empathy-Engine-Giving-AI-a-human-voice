@@ -29,6 +29,8 @@ from app.services.emotion.sentence_analysis import (
     analyze_text, detect_sentence_emotion, split_sentences
 )
 
+_PAUSE_MARKER_RE = re.compile(r"\|\|\d+ms\|\|")
+
 # ── Emotion → (voice, azure_style) ────────────────────────────────────────────
 # AriaNeural confirmed to support all listed styles on the Edge TTS free endpoint.
 # Note: styledegree is intentionally OMITTED — it breaks the free endpoint silently.
@@ -96,7 +98,16 @@ _edge_comm.mkssml = _styled_mkssml
 # ── Prosody converters ────────────────────────────────────────────────────────
 
 def _to_rate(r: str) -> str:
-    return "+0%" if r in ("default", None, "") else r
+    if r in ("default", None, ""):
+        return "+0%"
+    try:
+        pct = int(float(r.replace("%", "").replace("+", "")))
+        # Edge TTS safe range: -25% to +75%.
+        # More conservative clamp to avoid 'No audio received' reliably.
+        pct = max(-25, min(75, pct))
+        return f"+{pct}%" if pct >= 0 else f"{pct}%"
+    except Exception:
+        return "+0%"
 
 
 def _to_pitch(p: str) -> str:
@@ -105,6 +116,8 @@ def _to_pitch(p: str) -> str:
     try:
         st = float(p.replace("st", "").replace("+", ""))
         hz = round(st * 8.5)
+        # Edge TTS safe range: -20Hz to +20Hz (conservative to avoid failures)
+        hz = max(-20, min(20, hz))
         return f"+{hz}Hz" if hz >= 0 else f"{hz}Hz"
     except Exception:
         return "+0Hz"
@@ -161,23 +174,44 @@ class ExpressiveEdgeTTS(TTSEngine):
         text: str,
         filepath: str,
         emotion: str,
-        prosody: Dict[str, str],
+        rate: str,
+        pitch: str,
+        volume: str,
     ) -> str:
-        """Synthesize ONE sentence with the given emotion and prosody."""
-        voice, style = EMOTION_STYLE_MAP.get(emotion.lower(), _DEFAULT_STYLE)
-        rate   = _to_rate(prosody.get("rate", "default"))
-        pitch  = _to_pitch(prosody.get("pitch", "default"))
-        volume = _to_volume(prosody.get("volume", "default"))
+        """
+        Synthesize ONE sentence with pre-computed (clamped) prosody values.
 
-        tok = _ctx_style.set(style)
-        try:
-            communicate = edge_tts.Communicate(
-                text, voice=voice, rate=rate, pitch=pitch, volume=volume
-            )
-            await communicate.save(filepath)
-            return filepath
-        finally:
-            _ctx_style.reset(tok)
+        Prosody is passed in already converted by the caller so that ALL
+        segments across a multi-sentence synthesis share IDENTICAL rate/pitch/volume.
+        Retry once on transient 'No audio received' with the SAME values
+        (NOT neutral fallback) to maintain consistency.
+        """
+        voice, style = EMOTION_STYLE_MAP.get(emotion.lower(), _DEFAULT_STYLE)
+
+        for attempt in range(2):
+            tok = _ctx_style.set(style)
+            try:
+                communicate = edge_tts.Communicate(
+                    text, voice=voice, rate=rate, pitch=pitch, volume=volume
+                )
+                await communicate.save(filepath)
+                return filepath
+            except Exception as exc:
+                _ctx_style.reset(tok)
+                if "No audio was received" in str(exc) and attempt == 0:
+                    logger.warning(
+                        f"ExpressiveEdgeTTS: 'No audio received' for [{emotion}] "
+                        f"(rate={rate} pitch={pitch}) — retrying once..."
+                    )
+                    continue  # retry with SAME prosody (transient error)
+                raise
+            finally:
+                try:
+                    _ctx_style.reset(tok)
+                except Exception:
+                    pass
+
+        raise RuntimeError("ExpressiveEdgeTTS: synthesis failed after retry")
 
     async def synthesize(
         self,
@@ -187,54 +221,66 @@ class ExpressiveEdgeTTS(TTSEngine):
         prosody: Dict[str, str],
         emotion: str = "neutral",
     ) -> str:
+        # Safety: strip any ||Xms|| pause markers that weren't converted upstream
+        text = _PAUSE_MARKER_RE.sub(", ", text).strip()
+
         if not filepath.endswith(".mp3"):
             filepath = os.path.splitext(filepath)[0] + ".mp3"
+
+        # ── Pre-compute shared prosody values ONCE ──────────────────────────
+        # Converting here guarantees every segment gets IDENTICAL rate/pitch/volume.
+        # The emotional STYLE (cheerful/sad/angry) changes per sentence but the
+        # acoustic properties are locked to the request-level prosody.
+        shared_rate   = _to_rate(prosody.get("rate", "default"))
+        shared_pitch  = _to_pitch(prosody.get("pitch", "default"))
+        shared_volume = _to_volume(prosody.get("volume", "default"))
 
         sentences = split_sentences(text)
 
         # ── Single sentence ────────────────────────────────────────────────
         if len(sentences) <= 1:
-            voice, style = EMOTION_STYLE_MAP.get(emotion.lower(), _DEFAULT_STYLE)
+            _, style = EMOTION_STYLE_MAP.get(emotion.lower(), _DEFAULT_STYLE)
             logger.info(
                 f"ExpressiveEdgeTTS: [{emotion}→{style}] "
-                f"rate={_to_rate(prosody.get('rate','default'))} "
-                f"pitch={_to_pitch(prosody.get('pitch','default'))}"
+                f"rate={shared_rate} pitch={shared_pitch} vol={shared_volume}"
             )
             try:
-                await self._synth_sentence(text, filepath, emotion, prosody)
+                await self._synth_sentence(
+                    text, filepath, emotion,
+                    shared_rate, shared_pitch, shared_volume,
+                )
                 logger.info(f"Audio saved: {filepath}")
                 return filepath
             except Exception as e:
                 raise TTSGenerationError(f"ExpressiveEdgeTTS single-sentence error: {e}")
 
-        # ── Multi-sentence: per-sentence emotion, shared prosody ──────────
-        # Style (cheerful / sad / angry…) changes per sentence so the voice
-        # feels emotionally responsive.  Rate / pitch / volume are kept
-        # consistent across all segments so the overall speech tempo and
-        # loudness don't jump between sentences.
+        # ── Multi-sentence: per-sentence emotion style, SHARED prosody ─────
+        # Style (cheerful / sad / angry…) changes per sentence.
+        # rate / pitch / volume are pre-computed above and identical for ALL segments.
         logger.info(
             f"Multi-sentence mode: {len(sentences)} sentences — "
-            "per-sentence emotion detection active (shared rate/pitch/volume)"
+            f"shared prosody: rate={shared_rate} pitch={shared_pitch} vol={shared_volume}"
         )
 
         temp_paths = []
         for i, sentence in enumerate(sentences):
             s_emotion, _ = detect_sentence_emotion(sentence)
+            _, s_style   = EMOTION_STYLE_MAP.get(s_emotion.lower(), _DEFAULT_STYLE)
             temp = filepath.replace(".mp3", f"__seg{i}.mp3")
             temp_paths.append(temp)
 
             logger.info(
                 f"  Seg {i+1}/{len(sentences)}: "
                 f"'{sentence[:60]}{'...' if len(sentence)>60 else ''}' "
-                f"→ emotion={s_emotion} | "
-                f"rate={prosody.get('rate','default')} "
-                f"pitch={prosody.get('pitch','default')} "
-                f"vol={prosody.get('volume','default')}"
+                f"→ style={s_style} | "
+                f"rate={shared_rate} pitch={shared_pitch} vol={shared_volume}"
             )
 
             try:
-                # Pass the top-level prosody so rate/pitch/volume stay uniform
-                await self._synth_sentence(sentence, temp, s_emotion, prosody)
+                await self._synth_sentence(
+                    sentence, temp, s_emotion,
+                    shared_rate, shared_pitch, shared_volume,
+                )
             except Exception as e:
                 logger.error(f"  Seg {i+1} synthesis failed: {e}. Skipping.")
 
