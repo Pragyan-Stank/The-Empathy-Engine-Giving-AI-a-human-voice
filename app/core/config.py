@@ -9,10 +9,12 @@ class Settings(BaseSettings):
     
     # Emotion Model Config
     USE_TRANSFORMERS_MODEL: bool = True
-    HUGGINGFACE_EMOTION_MODEL: str = "mrm8488/distilbert-base-uncased-emotion"
-    
-    # TTS Provider Defaults
-    TTS_PROVIDER: str = "pyttsx3"  # options: google, pyttsx3, dummy
+    # Stable, publicly available 7-class emotion model (anger/disgust/fear/joy/neutral/sadness/surprise)
+    HUGGINGFACE_EMOTION_MODEL: str = "j-hartmann/emotion-english-distilroberta-base"
+
+    # TTS Provider (google | edge | pyttsx3)
+    # edge = Microsoft Edge neural voices, free, no API key needed
+    TTS_PROVIDER: str = "edge"
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
     HF_TOKEN: Optional[str] = None
@@ -27,5 +29,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = 'utf-8'
+        extra = 'ignore'   # silently ignore any unknown keys in .env
 
 settings = Settings()

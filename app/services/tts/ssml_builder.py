@@ -1,41 +1,65 @@
+"""
+SSMLBuilder produces two flavours of SSML:
+  - build_ssml_display(text, prosody)  → full SSML with <prosody> for UI preview
+  - build_ssml_engine(text)            → emphasis/pauses only (Google uses audioConfig for prosody)
+
+Both apply word-level <emphasis> and <break> after sentence-ending punctuation.
+"""
 import re
-from typing import Dict, Any
+from typing import Dict
+
+
+# Words that receive <emphasis level="strong">
+EMPHASIS_WORDS = {
+    "important", "urgent", "sorry", "great", "never", "always",
+    "critical", "love", "hate", "terrible", "amazing", "horrible",
+    "please", "help", "immediately", "now", "desperate", "incredible",
+}
+
 
 class SSMLBuilder:
-    def __init__(self):
-        # We can add vendor-specific namespaces here later
-        pass
-
-    def build_ssml(self, text: str, prosody: Dict[str, str]) -> str:
-        """
-        Wrap text in SSML tags. applies <prosody> and extracts structural clues
-        like exclamation points for pauses.
-        """
-        # A simple cleanup
-        clean_text = self._escape_xml(text)
-        
-        # Word emphasis mock-up using <emphasis> for strong words
-        clean_text = self._apply_word_emphasis(clean_text)
-        
-        # Build prosody tag
+    def build_ssml_display(self, text: str, prosody: Dict[str, str]) -> str:
+        """Full SSML with <prosody> for UI preview panel."""
+        inner = self._build_inner(text)
         rate = prosody.get("rate", "default")
         pitch = prosody.get("pitch", "default")
         volume = prosody.get("volume", "default")
-        
-        prosody_attrs = []
-        if rate != "default": prosody_attrs.append(f'rate="{rate}"')
-        if pitch != "default": prosody_attrs.append(f'pitch="{pitch}"')
-        if volume != "default": prosody_attrs.append(f'volume="{volume}"')
-        
-        prosody_str = " ".join(prosody_attrs)
-        
-        if prosody_str:
-            ssml_content = f"<prosody {prosody_str}>{clean_text}</prosody>"
-        else:
-            ssml_content = clean_text
 
-        # Return standard SSML
-        return f"<speak>{ssml_content}</speak>"
+        attrs = []
+        if rate != "default":
+            attrs.append(f'rate="{rate}"')
+        if pitch != "default":
+            attrs.append(f'pitch="{pitch}"')
+        if volume != "default":
+            attrs.append(f'volume="{volume}"')
+
+        if attrs:
+            inner = f'<prosody {" ".join(attrs)}>{inner}</prosody>'
+
+        return f"<speak>{inner}</speak>"
+
+    def build_ssml_engine(self, text: str) -> str:
+        """
+        SSML for the TTS engine — NO <prosody> wrapper (prosody is set via
+        audioConfig / engine properties to avoid double-application).
+        Contains emphasis and pause markup only.
+        """
+        inner = self._build_inner(text)
+        return f"<speak>{inner}</speak>"
+
+    # Keep backward-compatible alias used by old call sites
+    def build_ssml(self, text: str, prosody: Dict[str, str]) -> str:
+        return self.build_ssml_display(text, prosody)
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _build_inner(self, text: str) -> str:
+        escaped = self._escape_xml(text)
+        with_emphasis = self._apply_word_emphasis(escaped)
+        with_pauses = self._apply_pauses(with_emphasis)
+        return with_pauses
 
     def _escape_xml(self, text: str) -> str:
         text = text.replace("&", "&amp;")
@@ -46,14 +70,18 @@ class SSMLBuilder:
         return text
 
     def _apply_word_emphasis(self, text: str) -> str:
-        strong_words = {"important", "urgent", "sorry", "great", "never", "always", "critical"}
         words = text.split()
-        emphasized = []
+        out = []
         for w in words:
-            # strip punct to check
-            clean_w = re.sub(r'[^\w\s]', '', w.lower())
-            if clean_w in strong_words:
-                emphasized.append(f'<emphasis level="strong">{w}</emphasis>')
+            clean_w = re.sub(r'[^\w]', '', w.lower())
+            if clean_w in EMPHASIS_WORDS:
+                out.append(f'<emphasis level="strong">{w}</emphasis>')
             else:
-                emphasized.append(w)
-        return " ".join(emphasized)
+                out.append(w)
+        return " ".join(out)
+
+    def _apply_pauses(self, text: str) -> str:
+        """Insert a short <break> after sentence-ending punctuation."""
+        # After . ! ? that are NOT inside a tag
+        text = re.sub(r'([.!?])(?!\s*<)', r'\1<break time="300ms"/>', text)
+        return text
