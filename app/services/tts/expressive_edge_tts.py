@@ -17,7 +17,7 @@ import os
 import re
 import math
 import contextvars
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import edge_tts
 import edge_tts.communicate as _edge_comm
@@ -28,6 +28,7 @@ from app.core.logging_config import logger
 from app.services.emotion.sentence_analysis import (
     analyze_text, detect_sentence_emotion, split_sentences
 )
+from app.services.tts.prosody_curve import build_segment_prosodies, edge_tts_format
 
 _PAUSE_MARKER_RE = re.compile(r"\|\|\d+ms\|\|")
 
@@ -220,6 +221,7 @@ class ExpressiveEdgeTTS(TTSEngine):
         filepath: str,
         prosody: Dict[str, str],
         emotion: str = "neutral",
+        segment_deltas: List[Dict] = None,
     ) -> str:
         # Safety: strip any ||Xms|| pause markers that weren't converted upstream
         text = _PAUSE_MARKER_RE.sub(", ", text).strip()
@@ -254,13 +256,25 @@ class ExpressiveEdgeTTS(TTSEngine):
             except Exception as e:
                 raise TTSGenerationError(f"ExpressiveEdgeTTS single-sentence error: {e}")
 
-        # ── Multi-sentence: per-sentence emotion style, SHARED prosody ─────
-        # Style (cheerful / sad / angry…) changes per sentence.
-        # rate / pitch / volume are pre-computed above and identical for ALL segments.
-        logger.info(
-            f"Multi-sentence mode: {len(sentences)} sentences — "
-            f"shared prosody: rate={shared_rate} pitch={shared_pitch} vol={shared_volume}"
-        )
+        # ── Multi-sentence: per-sentence emotion style + prosody curves ──────
+        # Style (cheerful/sad/angry) changes per sentence — emotional responsiveness.
+        # Prosody (rate/pitch/volume) uses:
+        #   - LLM segment_deltas if provided (intentional micro-variation from context)
+        #   - Shared base prosody otherwise (consistent, prevents jarring jumps)
+        use_curves = bool(segment_deltas) and len(segment_deltas) >= len(sentences)
+
+        if use_curves:
+            seg_prosodies = build_segment_prosodies(prosody, segment_deltas)
+            logger.info(
+                f"Multi-sentence mode: {len(sentences)} sentences — "
+                f"LLM prosody curves active (base + per-segment deltas)"
+            )
+        else:
+            seg_prosodies = [None] * len(sentences)  # None = use shared base
+            logger.info(
+                f"Multi-sentence mode: {len(sentences)} sentences — "
+                f"shared prosody: rate={shared_rate} pitch={shared_pitch} vol={shared_volume}"
+            )
 
         temp_paths = []
         for i, sentence in enumerate(sentences):
@@ -269,17 +283,24 @@ class ExpressiveEdgeTTS(TTSEngine):
             temp = filepath.replace(".mp3", f"__seg{i}.mp3")
             temp_paths.append(temp)
 
+            # Use LLM-curve prosody if available, otherwise shared base
+            if use_curves and seg_prosodies[i]:
+                seg_p = seg_prosodies[i]
+                s_rate, s_pitch, s_vol = edge_tts_format(seg_p)
+            else:
+                s_rate, s_pitch, s_vol = shared_rate, shared_pitch, shared_volume
+
             logger.info(
                 f"  Seg {i+1}/{len(sentences)}: "
                 f"'{sentence[:60]}{'...' if len(sentence)>60 else ''}' "
                 f"→ style={s_style} | "
-                f"rate={shared_rate} pitch={shared_pitch} vol={shared_volume}"
+                f"rate={s_rate} pitch={s_pitch} vol={s_vol}"
             )
 
             try:
                 await self._synth_sentence(
                     sentence, temp, s_emotion,
-                    shared_rate, shared_pitch, shared_volume,
+                    s_rate, s_pitch, s_vol,
                 )
             except Exception as e:
                 logger.error(f"  Seg {i+1} synthesis failed: {e}. Skipping.")

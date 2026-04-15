@@ -1,0 +1,65 @@
+2026-04-16 03:34:12,080 - INFO - [empathy_engine] - [ReqID: ] - Audio post-processing disabled — ffmpeg not found on PATH. Install ffmpeg to enable EQ/reverb enhancement: https://ffmpeg.org/download.html
+2026-04-16 03:34:12,104 - INFO - [empathy_engine] - [ReqID: ] - ElevenLabs TTS ready — SDK v2, model=eleven_v3, voice=21m00Tcm4TlvDq8ikWAM
+2026-04-16 03:34:12,104 - INFO - [empathy_engine] - [ReqID: ] - Google Cloud TTS (REST) initialized with API key.
+2026-04-16 03:34:12,106 - INFO - [empathy_engine] - [ReqID: ] - ExpressiveEdgeTTS ready — AriaNeural styles + per-sentence emotion splitting
+2026-04-16 03:34:12,106 - INFO - [empathy_engine] - [ReqID: ] - Edge TTS initialized — voice: en-US-AriaNeural
+2026-04-16 03:34:37,542 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - Synthesize — text length: 75
+2026-04-16 03:34:37,551 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - Loading transformer model j-hartmann/emotion-english-distilroberta-base
+2026-04-16 03:34:39,643 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - Auto prosody: {'rate': '+30%', 'pitch': '+1.0st', 'volume': '+4.0dB'}
+2026-04-16 03:34:40,145 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - SpeechAnalyzer [Groq]: style=casual, filler='you know', segments=3, humanized_len=78
+2026-04-16 03:34:40,146 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - Speech analysis: llm=True, style=casual, segments=3
+2026-04-16 03:34:40,148 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - Multi-emotion text — 3 sentences, emotions: ['contentment', 'sadness', 'neutral']
+2026-04-16 03:34:40,149 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - Using LLM-humanized text: 'I trusted you with everything, but you lied to me... Why would you do this...?...'
+2026-04-16 03:34:40,161 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - ElevenLabs: emotion=anger, stability=0.3, style=0.8
+2026-04-16 03:34:40,599 - ERROR - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - ElevenLabs failed (ElevenLabs SDK error: headers: {'date': 'Wed, 15 Apr 2026 22:04:39 GMT', 'server': 'uvicorn', 'content-length': '256', 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, PATCH, OPTIONS, DELETE, GET, PUT', 'access-control-max-). Trying Google TTS.
+2026-04-16 03:34:40,600 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - Google TTS: rate=1.3, pitch=1.0st, volume=4.0dB
+2026-04-16 03:34:41,016 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - Google TTS audio saved to output_audio\ef8f07741f57a9140dd90b5c95c17abb.mp3 (37824 bytes)
+2026-04-16 03:34:41,020 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - Audio saved: output_audio\ef8f07741f57a9140dd90b5c95c17abb.mp3
+2026-04-16 03:34:41,021 - INFO - [empathy_engine] - [ReqID: 02f99b21-04f3-4999-b55a-314da1598d8f] - Post-processing complete: output_audio\ef8f07741f57a9140dd90b5c95c17abb.mp3
+INFO:     127.0.0.1:52803 - "POST /api/v1/synthesize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60207 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60207 - "GET /static/css/style.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:65219 - "GET /static/js/app.js HTTP/1.1" 304 Not Modified
+2026-04-16 03:36:00,114 - INFO - [empathy_engine] - [ReqID: e30db288-fe46-4e5d-b49b-12ab11d89dab] - Synthesize — text length: 118
+2026-04-16 03:36:00,229 - INFO - [empathy_engine] - [ReqID: e30db288-fe46-4e5d-b49b-12ab11d89dab] - Auto prosody: {'rate': 'default', 'pitch': 'default', 'volume': 'default'}
+2026-04-16 03:36:00,916 - INFO - [empathy_engine] - [ReqID: e30db288-fe46-4e5d-b49b-12ab11d89dab] - SpeechAnalyzer [Groq]: style=conversational, filler='you know', segments=5, humanized_len=144
+2026-04-16 03:36:00,918 - INFO - [empathy_engine] - [ReqID: e30db288-fe46-4e5d-b49b-12ab11d89dab] - Speech analysis: llm=True, style=conversational, segments=5
+2026-04-16 03:36:00,920 - INFO - [empathy_engine] - [ReqID: e30db288-fe46-4e5d-b49b-12ab11d89dab] - Using LLM-humanized text: 'So, I'd like to upgrade my current TTS system to produce highly expressive, huma...'
+2026-04-16 03:36:00,939 - INFO - [empathy_engine] - [ReqID: e30db288-fe46-4e5d-b49b-12ab11d89dab] - ElevenLabs: emotion=neutral, stability=0.65, style=0.25
+2026-04-16 03:36:01,146 - ERROR - [empathy_engine] - [ReqID: e30db288-fe46-4e5d-b49b-12ab11d89dab] - ElevenLabs failed (ElevenLabs SDK error: headers: {'date': 'Wed, 15 Apr 2026 22:06:01 GMT', 'server': 'uvicorn', 'content-length': '256', 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, PATCH, OPTIONS, DELETE, GET, PUT', 'access-control-max-). Trying Google TTS.
+2026-04-16 03:36:01,147 - INFO - [empathy_engine] - [ReqID: e30db288-fe46-4e5d-b49b-12ab11d89dab] - Google TTS: rate=1.0, pitch=0.0st, volume=0.0dB
+2026-04-16 03:36:01,700 - INFO - [empathy_engine] - [ReqID: e30db288-fe46-4e5d-b49b-12ab11d89dab] - Google TTS audio saved to output_audio\9ca889a5869f5879514443e2ac233511.mp3 (78528 bytes)
+2026-04-16 03:36:01,711 - INFO - [empathy_engine] - [ReqID: e30db288-fe46-4e5d-b49b-12ab11d89dab] - Audio saved: output_audio\9ca889a5869f5879514443e2ac233511.mp3
+2026-04-16 03:36:01,711 - INFO - [empathy_engine] - [ReqID: e30db288-fe46-4e5d-b49b-12ab11d89dab] - Post-processing complete: output_audio\9ca889a5869f5879514443e2ac233511.mp3
+INFO:     127.0.0.1:59556 - "POST /api/v1/synthesize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59556 - "GET /api/v1/audio/9ca889a5869f5879514443e2ac233511.mp3?t=1776290761722 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:59556 - "GET /static/assets/favicon.png HTTP/1.1" 304 Not Modified
+2026-04-16 03:36:30,989 - INFO - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - Synthesize — text length: 499
+2026-04-16 03:36:31,287 - INFO - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - Auto prosody: {'rate': 'default', 'pitch': 'default', 'volume': 'default'}
+2026-04-16 03:36:31,902 - INFO - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - SpeechAnalyzer [Groq]: style=casual|empathetic, filler='you know', segments=2, humanized_len=183
+2026-04-16 03:36:31,910 - INFO - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - Speech analysis: llm=True, style=casual|empathetic, segments=2
+2026-04-16 03:36:31,912 - INFO - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - Multi-emotion text — 5 sentences, emotions: ['neutral', 'contentment']
+2026-04-16 03:36:31,912 - INFO - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - Using LLM-humanized text: 'So, you want to transform your current TTS pipeline into a Sarvam AI level expre...'
+2026-04-16 03:36:31,930 - INFO - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - ElevenLabs: emotion=neutral, stability=0.65, style=0.25
+2026-04-16 03:36:32,164 - ERROR - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - ElevenLabs failed (ElevenLabs SDK error: headers: {'date': 'Wed, 15 Apr 2026 22:06:31 GMT', 'server': 'uvicorn', 'content-length': '256', 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, PATCH, OPTIONS, DELETE, GET, PUT', 'access-control-max-). Trying Google TTS.
+2026-04-16 03:36:32,166 - INFO - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - Google TTS: rate=1.0, pitch=0.0st, volume=0.0dB
+2026-04-16 03:36:32,785 - INFO - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - Google TTS audio saved to output_audio\add86473fc830fc55343d5a07625c7ad.mp3 (91200 bytes)
+2026-04-16 03:36:32,796 - INFO - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - Audio saved: output_audio\add86473fc830fc55343d5a07625c7ad.mp3
+2026-04-16 03:36:32,797 - INFO - [empathy_engine] - [ReqID: 6c92e25c-7708-41ed-b4c7-6429bb3bef3f] - Post-processing complete: output_audio\add86473fc830fc55343d5a07625c7ad.mp3
+INFO:     127.0.0.1:65012 - "POST /api/v1/synthesize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65012 - "GET /api/v1/audio/add86473fc830fc55343d5a07625c7ad.mp3?t=1776290792807 HTTP/1.1" 206 Partial Content
+2026-04-16 03:37:03,864 - INFO - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - Synthesize — text length: 498
+2026-04-16 03:37:04,161 - INFO - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - Auto prosody: {'rate': 'default', 'pitch': 'default', 'volume': 'default'}
+2026-04-16 03:37:04,658 - INFO - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - SpeechAnalyzer [Groq]: style=casual, filler='you know', segments=2, humanized_len=205
+2026-04-16 03:37:04,669 - INFO - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - Speech analysis: llm=True, style=casual, segments=2
+2026-04-16 03:37:04,671 - INFO - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - Multi-emotion text — 5 sentences, emotions: ['neutral', 'contentment']
+2026-04-16 03:37:04,672 - INFO - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - Using LLM-humanized text: 'So, you want to transform your current TTS pipeline into a Sarvam AI-level expre...'
+2026-04-16 03:37:04,690 - INFO - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - ElevenLabs: emotion=neutral, stability=0.65, style=0.25
+2026-04-16 03:37:04,914 - ERROR - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - ElevenLabs failed (ElevenLabs SDK error: headers: {'date': 'Wed, 15 Apr 2026 22:07:04 GMT', 'server': 'uvicorn', 'content-length': '256', 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, PATCH, OPTIONS, DELETE, GET, PUT', 'access-control-max-). Trying Google TTS.
+2026-04-16 03:37:04,916 - INFO - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - Google TTS: rate=1.0, pitch=0.0st, volume=0.0dB
+2026-04-16 03:37:05,577 - INFO - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - Google TTS audio saved to output_audio\616f716a8d3ccd955874e64756d86ca2.mp3 (98112 bytes)
+2026-04-16 03:37:05,582 - INFO - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - Audio saved: output_audio\616f716a8d3ccd955874e64756d86ca2.mp3
+2026-04-16 03:37:05,583 - INFO - [empathy_engine] - [ReqID: 64c0d75a-8baa-4ea8-b728-5a219e5889a1] - Post-processing complete: output_audio\616f716a8d3ccd955874e64756d86ca2.mp3
+INFO:     127.0.0.1:53654 - "POST /api/v1/synthesize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53654 - "GET /api/v1/audio/616f716a8d3ccd955874e64756d86ca2.mp3?t=1776290825591 HTTP/1.1" 206 Partial Content
+ 

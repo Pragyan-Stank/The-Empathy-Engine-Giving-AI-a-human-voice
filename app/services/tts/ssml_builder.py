@@ -102,9 +102,10 @@ class SSMLBuilder:
         text: str,
         prosody: Dict[str, str],
         emotion: str = "neutral",
+        extra_emphasis: list = None,
     ) -> str:
         """Full SSML with <prosody> for UI preview panel."""
-        inner = self._build_inner(text, emotion)
+        inner = self._build_inner(text, emotion, extra_emphasis=extra_emphasis)
         wrapper = self._prosody_attrs_from_dict(prosody)
         if wrapper:
             inner = f'<prosody {wrapper}>{inner}</prosody>'
@@ -115,6 +116,7 @@ class SSMLBuilder:
         text: str,
         prosody: Optional[Dict[str, str]] = None,
         emotion: str = "neutral",
+        extra_emphasis: list = None,
     ) -> str:
         """
         SSML for the TTS engine.
@@ -122,7 +124,7 @@ class SSMLBuilder:
         Includes emphasis + pauses but NOT a double-wrapped prosody on top
         (Google uses audioConfig; Edge uses Communicate() params).
         """
-        inner = self._build_inner(text, emotion)
+        inner = self._build_inner(text, emotion, extra_emphasis=extra_emphasis)
         return f"<speak>{inner}</speak>"
 
     def build_segment_ssml(
@@ -130,12 +132,13 @@ class SSMLBuilder:
         segment_text: str,
         prosody: Dict[str, str],
         emotion: str = "neutral",
+        extra_emphasis: list = None,
     ) -> str:
         """
         Build SSML for a single segment (used in multi-sentence synthesis).
         Wraps with <prosody> so each segment has its own voice shaping.
         """
-        inner = self._build_inner(segment_text, emotion)
+        inner = self._build_inner(segment_text, emotion, extra_emphasis=extra_emphasis)
         wrapper = self._prosody_attrs_from_dict(prosody)
         if wrapper:
             inner = f'<prosody {wrapper}>{inner}</prosody>'
@@ -147,13 +150,15 @@ class SSMLBuilder:
 
     # ── Private Helpers ────────────────────────────────────────────────────────
 
-    def _build_inner(self, text: str, emotion: str = "neutral") -> str:
+    def _build_inner(
+        self, text: str, emotion: str = "neutral", extra_emphasis: list = None
+    ) -> str:
         """Core pipeline: escape → pause markers → emphasis → punctuation breaks."""
         escaped = self._escape_xml(text)
         # Replace ||Xms|| pause markers injected by TextEnhancer
         processed = self._resolve_pause_markers(escaped)
         # Apply word-level emphasis (skipped for calm/sad emotions)
-        processed = self._apply_emphasis(processed, emotion)
+        processed = self._apply_emphasis(processed, emotion, extra_emphasis=extra_emphasis)
         # Convert punctuation to <break> tags
         processed = self._apply_punctuation_breaks(processed)
         return processed
@@ -174,15 +179,21 @@ class SSMLBuilder:
             text,
         )
 
-    def _apply_emphasis(self, text: str, emotion: str) -> str:
+    def _apply_emphasis(
+        self, text: str, emotion: str, extra_emphasis: list = None
+    ) -> str:
         """
         Apply <emphasis> tags to emotionally charged words.
         - Skipped entirely for calm/sad emotions (sounds robotic)
         - level="strong" for anger/excitement on critical words
         - level="moderate" for positive/important on key words
+        - extra_emphasis: additional words from LLM context analysis
         """
         if emotion in _NO_EMPHASIS_EMOTIONS:
             return text
+
+        # Merge static word set with LLM-identified extra words
+        extra_set = {w.lower().strip() for w in (extra_emphasis or [])}
 
         level = "strong" if emotion in _STRONG_EMPHASIS_EMOTIONS else "moderate"
         words = text.split()
@@ -193,7 +204,7 @@ class SSMLBuilder:
                 out.append(w)
                 continue
             clean = re.sub(r"[^\w]", "", w.lower())
-            if clean in _STRONG_WORDS:
+            if clean in _STRONG_WORDS or clean in extra_set:
                 out.append(f'<emphasis level="{level}">{w}</emphasis>')
             elif clean in _MODERATE_WORDS and level == "moderate":
                 out.append(f'<emphasis level="moderate">{w}</emphasis>')

@@ -1,0 +1,529 @@
+INFO:     Will watch for changes in these directories: ['C:\\Neutron\\Gen_AI\\Projects\\4_Darwix_AI']
+INFO:     Uvicorn running on http://127.0.0.1:8080 (Press CTRL+C to quit)
+INFO:     Started reloader process [192] using StatReload
+C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\pydub\utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+INFO:     Started server process [20376]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|##########| 105/105 [00:00<00:00, 29385.60it/s]
+[1mRobertaForSequenceClassification LOAD REPORT[0m from: j-hartmann/emotion-english-distilroberta-base
+Key                             | Status     |  | 
+--------------------------------+------------+--+-
+roberta.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\logging\__init__.py", line 1101, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 112: character maps to <undefined>
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 129, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 315, in _bootstrap
+    self.run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_compat.py", line 60, in asyncio_run
+    return loop.run_until_complete(main)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 628, in run_until_complete
+    self.run_forever()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 595, in run_forever
+    self._run_once()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 1881, in _run_once
+    handle._run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 155, in synthesize_speech
+    base_emotion, confidence = _detect_emotion(clean_text)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 67, in _detect_emotion
+    logger.info(f"Transformer \u2192 emotion={label}, conf={confidence:.2f}")
+Message: 'Transformer \u2192 emotion=anger, conf=0.84'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\logging\__init__.py", line 1101, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 117: character maps to <undefined>
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 129, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 315, in _bootstrap
+    self.run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_compat.py", line 60, in asyncio_run
+    return loop.run_until_complete(main)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 628, in run_until_complete
+    self.run_forever()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 595, in run_forever
+    self._run_once()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 1881, in _run_once
+    handle._run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 231, in synthesize_speech
+    logger.info(f"Text enhanced: {len(clean_text)}\u2192{len(tts_text)} chars")
+Message: 'Text enhanced: 75\u219278 chars'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\logging\__init__.py", line 1101, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 112: character maps to <undefined>
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 129, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 315, in _bootstrap
+    self.run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_compat.py", line 60, in asyncio_run
+    return loop.run_until_complete(main)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 628, in run_until_complete
+    self.run_forever()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 595, in run_forever
+    self._run_once()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 1881, in _run_once
+    handle._run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 155, in synthesize_speech
+    base_emotion, confidence = _detect_emotion(clean_text)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 67, in _detect_emotion
+    logger.info(f"Transformer \u2192 emotion={label}, conf={confidence:.2f}")
+Message: 'Transformer \u2192 emotion=neutral, conf=0.94'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\logging\__init__.py", line 1101, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 118: character maps to <undefined>
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 129, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 315, in _bootstrap
+    self.run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_compat.py", line 60, in asyncio_run
+    return loop.run_until_complete(main)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 628, in run_until_complete
+    self.run_forever()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 595, in run_forever
+    self._run_once()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 1881, in _run_once
+    handle._run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 231, in synthesize_speech
+    logger.info(f"Text enhanced: {len(clean_text)}\u2192{len(tts_text)} chars")
+Message: 'Text enhanced: 118\u2192144 chars'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\logging\__init__.py", line 1101, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 112: character maps to <undefined>
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 129, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 315, in _bootstrap
+    self.run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_compat.py", line 60, in asyncio_run
+    return loop.run_until_complete(main)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 628, in run_until_complete
+    self.run_forever()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 595, in run_forever
+    self._run_once()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 1881, in _run_once
+    handle._run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 155, in synthesize_speech
+    base_emotion, confidence = _detect_emotion(clean_text)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 67, in _detect_emotion
+    logger.info(f"Transformer \u2192 emotion={label}, conf={confidence:.2f}")
+Message: 'Transformer \u2192 emotion=neutral, conf=0.94'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\logging\__init__.py", line 1101, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 118: character maps to <undefined>
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 129, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 315, in _bootstrap
+    self.run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_compat.py", line 60, in asyncio_run
+    return loop.run_until_complete(main)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 628, in run_until_complete
+    self.run_forever()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 595, in run_forever
+    self._run_once()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 1881, in _run_once
+    handle._run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 231, in synthesize_speech
+    logger.info(f"Text enhanced: {len(clean_text)}\u2192{len(tts_text)} chars")
+Message: 'Text enhanced: 499\u2192183 chars'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\logging\__init__.py", line 1101, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 112: character maps to <undefined>
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 129, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 315, in _bootstrap
+    self.run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_compat.py", line 60, in asyncio_run
+    return loop.run_until_complete(main)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 628, in run_until_complete
+    self.run_forever()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 595, in run_forever
+    self._run_once()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 1881, in _run_once
+    handle._run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 155, in synthesize_speech
+    base_emotion, confidence = _detect_emotion(clean_text)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 67, in _detect_emotion
+    logger.info(f"Transformer \u2192 emotion={label}, conf={confidence:.2f}")
+Message: 'Transformer \u2192 emotion=neutral, conf=0.94'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\logging\__init__.py", line 1101, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 118: character maps to <undefined>
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 116, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\spawn.py", line 129, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 315, in _bootstrap
+    self.run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\uvicorn\_compat.py", line 60, in asyncio_run
+    return loop.run_until_complete(main)
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 628, in run_until_complete
+    self.run_forever()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 595, in run_forever
+    self._run_once()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 1881, in _run_once
+    handle._run()
+  File "C:\Users\Pragyan\AppData\Local\Programs\Python\Python310\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\venv\lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+  File "C:\Neutron\Gen_AI\Projects\4_Darwix_AI\app\api\routes\synthesize.py", line 231, in synthesize_speech
+    logger.info(f"Text enhanced: {len(clean_text)}\u2192{len(tts_text)} chars")
+Message: 'Text enhanced: 498\u2192205 chars'
+Arguments: ()
+WARNING:  StatReload detected changes in 'app\api\routes\synthesize.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [20376]

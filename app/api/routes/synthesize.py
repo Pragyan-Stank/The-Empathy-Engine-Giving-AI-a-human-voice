@@ -41,6 +41,8 @@ from app.services.tts.edge_tts_engine import EdgeTTSEngine
 from app.services.tts.fallback_tts import FallbackTTS
 from app.services.audio.storage import AudioStorageService
 from app.services.audio.post_processor import process_audio
+from app.services.llm.speech_analyzer import analyze_speech, SpeechAnalysis
+from app.services.tts.prosody_curve import build_segment_prosodies, edge_tts_format
 
 router = APIRouter()
 
@@ -80,6 +82,7 @@ async def _synthesize_audio(
     filepath: str,
     prosody: dict,
     emotion: str,
+    segment_deltas: list = None,
 ) -> str:
     """Try providers in priority order; return actual saved filepath."""
 
@@ -101,12 +104,13 @@ async def _synthesize_audio(
         except TTSGenerationError as e:
             logger.error(f"Google TTS failed ({e}). Trying Expressive Edge TTS.")
 
-    # 3 — Expressive Edge TTS (emotion voice styles + prosody via WebSocket SSML)
+    # 3 — Expressive Edge TTS (emotion voice styles + prosody curves from LLM)
     if _expressive_edge.available:
         edge_path = os.path.splitext(filepath)[0] + ".mp3"
         try:
             return await _expressive_edge.synthesize(
-                text, engine_ssml, edge_path, prosody, emotion=emotion
+                text, engine_ssml, edge_path, prosody, emotion=emotion,
+                segment_deltas=segment_deltas or [],
             )
         except TTSGenerationError as e:
             logger.error(f"Expressive Edge TTS failed ({e}). Trying basic Edge TTS.")
@@ -126,6 +130,7 @@ async def _synthesize_audio(
     return await _pyttsx3_tts.synthesize(
         text, engine_ssml, wav_path, prosody, emotion=emotion
     )
+
 
 
 # ── Route ──────────────────────────────────────────────────────────────────────
@@ -177,7 +182,19 @@ async def synthesize_speech(request: SynthesizeRequest):
         prosody = calculate_prosody(emotion_label, request.intensity)
         logger.info(f"Auto prosody: {prosody}")
 
-        # Step 5 — Manual slider overrides
+        # Step 4.5 — LLM Speech Analysis (Groq)
+        # Rewrites text into natural spoken form and produces per-segment prosody deltas.
+        # Falls back gracefully (< 4s timeout) so synthesis is never blocked.
+        speech_analysis: SpeechAnalysis = await analyze_speech(
+            clean_text, emotion_label, request.intensity
+        )
+        logger.info(
+            f"Speech analysis: llm={speech_analysis.llm_used}, "
+            f"style={speech_analysis.delivery_style}, "
+            f"segments={len(speech_analysis.segments)}"
+        )
+
+        # Step 5 — Manual slider overrides (applied after LLM so user overrides win)
         if request.rate_override:
             prosody["rate"] = request.rate_override
         if request.pitch_override:
@@ -199,19 +216,51 @@ async def synthesize_speech(request: SynthesizeRequest):
             )
 
         # Step 7 — Text Enhancement (punctuation injection + chunking)
-        enhanced_text = enhance_text(clean_text, emotion_label, request.intensity)
-        # TTS-safe text: convert ||Xms|| pause markers to a natural pause.
-        # If a marker follows punctuation (.!?) → just a space (punctuation gives the pause).
-        # If a marker follows a word → insert a comma (light breath pause).
+        # CRITICAL: Always use FULL clean_text as the TTS source.
+        # LLM humanized_text is capped at 800 chars by the token budget —
+        # using it for long texts silently drops everything after ~800 chars.
+        # LLM value for long texts = segment_deltas + emphasis_words, NOT text rewriting.
+        SHORT_TEXT_LIMIT = 600  # safe: LLM saw the whole text within this limit
+        if (
+            speech_analysis.llm_used
+            and speech_analysis.humanized_text
+            and len(clean_text) <= SHORT_TEXT_LIMIT
+        ):
+            base_for_tts = speech_analysis.humanized_text
+            logger.info(f"Using LLM-humanized text ({len(base_for_tts)} chars)")
+        else:
+            base_for_tts = clean_text
+            if speech_analysis.llm_used and len(clean_text) > SHORT_TEXT_LIMIT:
+                logger.info(
+                    f"Long text ({len(clean_text)} chars) — using full clean_text; "
+                    "LLM prosody deltas + emphasis still applied"
+                )
+
+        enhanced_text = enhance_text(base_for_tts, emotion_label, request.intensity)
         tts_text = re.sub(r"(?<=[.!?,])\s*\|\|\d+ms\|\|\s*", " ", enhanced_text)
         tts_text = re.sub(r"\|\|\d+ms\|\|", ", ", tts_text).strip()
-        logger.info(
-            f"Text enhanced: {len(clean_text)}→{len(tts_text)} chars"
-        )
+        logger.info(f"Text enhanced: {len(clean_text)}→{len(tts_text)} chars")
 
-        # Step 8 — SSML generation (now emotion-aware)
-        engine_ssml  = _ssml_builder.build_ssml_engine(enhanced_text, prosody, emotion_label)
-        display_ssml = _ssml_builder.build_ssml_display(enhanced_text, prosody, emotion_label)
+        # Collect LLM emphasis words and segment deltas for downstream use
+        segment_deltas = [
+            {
+                "rate_delta_pct":  s.rate_delta_pct,
+                "pitch_delta_hz":  s.pitch_delta_hz,
+                "volume_delta_db": s.volume_delta_db,
+                "pause_before_ms": s.pause_before_ms,
+                "emotion":         s.emotion,
+            }
+            for s in speech_analysis.segments
+        ]
+        llm_emphasis = [w for s in speech_analysis.segments for w in s.emphasis_words]
+
+        # Step 8 — SSML generation (emotion-aware + LLM emphasis words)
+        engine_ssml  = _ssml_builder.build_ssml_engine(
+            enhanced_text, prosody, emotion_label, extra_emphasis=llm_emphasis
+        )
+        display_ssml = _ssml_builder.build_ssml_display(
+            enhanced_text, prosody, emotion_label, extra_emphasis=llm_emphasis
+        )
 
         # Step 9 — Cache key (prosody + emotion breakdown)
         filename = _storage.generate_filename(
@@ -224,9 +273,10 @@ async def synthesize_speech(request: SynthesizeRequest):
             final_path = base_filepath
             logger.info(f"Cache hit: {filename}")
         else:
-            # Step 10 — Synthesize (use enhanced tts_text for expressiveness)
+            # Step 10 — Synthesize with LLM-driven per-segment prosody curves
             final_path = await _synthesize_audio(
-                tts_text, engine_ssml, base_filepath, prosody, emotion_label
+                tts_text, engine_ssml, base_filepath, prosody, emotion_label,
+                segment_deltas=segment_deltas,
             )
             logger.info(f"Audio saved: {final_path}")
 

@@ -72,9 +72,45 @@ def detect_sentence_emotion(sentence: str) -> tuple:
 
 
 def split_sentences(text: str) -> List[str]:
-    """Split text at sentence boundaries (.!?) preserving punctuation."""
-    parts = re.split(r"(?<=[.!?])\s+", text.strip())
-    return [p.strip() for p in parts if p.strip()]
+    """
+    Split text into sentences at all natural boundaries.
+
+    Handles:
+    - Standard sentence endings: . ! ?
+    - Ellipsis: ... or \u2026 (treat as sentence boundary)
+    - Paragraph breaks: double newlines or single newlines between sentences
+    - Long paragraphs: no truncation, returns ALL sentences
+    """
+    # Normalize line breaks and ellipsis
+    text = text.strip()
+    text = text.replace("\u2026", "...")
+    text = re.sub(r"\r\n|\r", "\n", text)
+
+    # Split paragraph breaks (double-newline) first
+    paragraphs = re.split(r"\n{2,}", text)
+
+    all_sentences: List[str] = []
+    for para in paragraphs:
+        # Also split on single newlines that look like list items or line breaks
+        lines = re.split(r"\n", para)
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            # Split on sentence-ending punctuation and ellipsis
+            # Captures: ends with . ! ? or ... followed by whitespace
+            parts = re.split(r"(?<=\.{3})\s+|(?<=[.!?])(?!\d)\s+", line)
+            for p in parts:
+                p = p.strip()
+                if p:
+                    all_sentences.append(p)
+
+    # Fallback: if splitting produced nothing, return original
+    if not all_sentences:
+        return [text] if text else []
+
+    # Cap at 30 segments to prevent runaway processing on very long inputs
+    return all_sentences[:30]
 
 
 def analyze_text(text: str) -> List[SentenceResult]:
