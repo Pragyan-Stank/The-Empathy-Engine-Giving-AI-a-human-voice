@@ -88,6 +88,7 @@ class ElevenLabsTTS(TTSEngine):
         filepath: str,
         prosody: Dict[str, str],
         emotion: str = "neutral",
+        segment_deltas: list = None,
     ) -> str:
         if not self.available:
             raise TTSGenerationError("ElevenLabs not available.")

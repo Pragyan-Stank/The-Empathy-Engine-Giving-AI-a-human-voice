@@ -4,19 +4,27 @@ Text Enhancement Layer — converts raw input into expressive, speech-ready text
 Pipeline:
   1. Normalize whitespace / basic cleanup
   2. Hinglish & code-mix awareness (preserve contractions, transliterations)
-  3. Punctuation-as-emotion signals:
+  3. Indian English rhythm modeling:
+     - Longer pauses at discourse markers (toh, matlab, lekin)
+     - Natural emphasis on Hinglish particles (acha, haan, nahi)
+     - Preserve Indian sentence-final particles (hai, na, yaar)
+  4. Punctuation-as-emotion signals:
        "..." → hesitation / sadness break
        "!"   → excitement / urgency
        "?"   → curiosity / rising intonation
-  4. Auto-inject natural punctuation where missing (ellipsis on trailing
+  5. Auto-inject natural punctuation where missing (ellipsis on trailing
      negative sentiment, "!" on all-caps words, etc.)
-  5. Split long sentences into conversational chunks (≤18 words)
-  6. Insert <break> markers that the SSML builder picks up
+  6. Split long sentences into conversational chunks (≤18 words)
+  7. Insert <break> markers that the SSML builder picks up
+  8. Delivery arc integration:
+     - Opening chunks get longer pauses (setup)
+     - Middle chunks get shorter pauses (flow)
+     - Closing chunks get medium pauses (resolution)
 
 Output: enhanced plain text (NOT SSML) fed into the SSML builder.
 """
 import re
-from typing import List
+from typing import List, Tuple
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -26,6 +34,8 @@ _HESITATION_WORDS = {
     "but", "however", "though", "although", "still", "yet",
     "anyway", "regardless", "maybe", "perhaps", "i think",
     "i guess", "not sure", "i don't know",
+    # Hinglish hesitation
+    "shayad", "pata nahi", "kya pata", "ho sakta",
 }
 
 # Hinglish filler / discourse markers — preserve as-is, never split on them
@@ -33,6 +43,17 @@ _HINGLISH_FILLERS = {
     "yaar", "bhai", "bro", "sis", "acha", "haan", "nahi", "matlab",
     "toh", "bas", "chal", "arre", "oye", "suno", "dekho", "samjhe",
     "theek", "bilkul", "ekdum", "kya", "hai", "ho", "gaya", "karo",
+    "accha", "ji", "arrey", "chalo", "abhi", "bohot", "bahut",
+    "lekin", "kyunki", "isliye", "woh", "yeh", "mera", "tera",
+    "kuch", "koi", "kaisa", "kaise", "kitna", "kidhar", "idhar",
+    "udhar", "wahan", "yahan", "sach", "jhooth",
+}
+
+# Indian English discourse markers that get longer pauses
+_INDIAN_DISCOURSE_MARKERS = {
+    "toh", "matlab", "lekin", "kyunki", "isliye", "acha",
+    "accha", "dekho", "suno", "samjhe", "basically",
+    "actually", "see", "look", "you know",
 }
 
 # Emotion-to-pause length (ms) — injected as ||Xms|| markers
@@ -54,7 +75,9 @@ _PAUSE_MAP = {
 # Split long sentences at these connector words
 _SPLIT_CONNECTORS = re.compile(
     r"\b(and then|but then|because|so that|which means|therefore|however|although|"
-    r"even though|in fact|what's more|on top of that|not only that)\b",
+    r"even though|in fact|what's more|on top of that|not only that|"
+    # Hinglish connectors
+    r"toh phir|lekin phir|kyunki|isliye|matlab|aur phir|par|magar)\b",
     re.IGNORECASE,
 )
 
@@ -63,7 +86,12 @@ MAX_WORDS_PER_CHUNK = 18
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def enhance_text(text: str, emotion: str = "neutral", intensity: float = 1.0) -> str:
+def enhance_text(
+    text: str,
+    emotion: str = "neutral",
+    intensity: float = 1.0,
+    tone_arc: str = "steady",
+) -> str:
     """
     Full text enhancement pipeline.
 
@@ -71,9 +99,10 @@ def enhance_text(text: str, emotion: str = "neutral", intensity: float = 1.0) ->
     The SSML builder converts those markers to <break time="Xms"/> tags.
     """
     text = _normalize(text)
+    text = _preserve_hinglish_rhythm(text)
     text = _inject_auto_punctuation(text, emotion)
     chunks = _split_to_chunks(text)
-    chunks = _inject_pauses(chunks, emotion, intensity)
+    chunks = _inject_pauses(chunks, emotion, intensity, tone_arc)
     return " ".join(chunks)
 
 
@@ -97,6 +126,31 @@ def _normalize(text: str) -> str:
     # Fix missing space after punctuation (e.g. "hello.how" → "hello. how")
     text = re.sub(r"([.!?])([A-Za-z])", r"\1 \2", text)
     return text
+
+
+def _preserve_hinglish_rhythm(text: str) -> str:
+    """
+    Add natural pauses around Indian English discourse markers.
+
+    Indian speech patterns:
+    - "Acha, toh..." → pause after acha, pause after toh
+    - "Matlab..." → pause before the explanation
+    - "Dekho, ..." → command followed by pause
+    """
+    words = text.split()
+    result = []
+    for i, word in enumerate(words):
+        clean = re.sub(r"[^\w]", "", word).lower()
+
+        # Add comma after discourse markers if not already present
+        if clean in _INDIAN_DISCOURSE_MARKERS:
+            if not word.endswith((",", ".", "!", "?", "...")):
+                # Only add comma if next word exists and this isn't end of sentence
+                if i < len(words) - 1:
+                    word = word + ","
+        result.append(word)
+
+    return " ".join(result)
 
 
 def _inject_auto_punctuation(text: str, emotion: str) -> str:
@@ -134,7 +188,7 @@ def _inject_auto_punctuation(text: str, emotion: str) -> str:
         # Question without "?" (simple heuristic: starts with wh-word / do-you)
         elif (
             not sent[-1] in ".!?"
-            and re.match(r'^(who|what|where|when|why|how|do you|does|did|is it|are you|can you|would you)', lower)
+            and re.match(r'^(who|what|where|when|why|how|do you|does|did|is it|are you|can you|would you|kya|kaise|kyun|kidhar|kab)', lower)
         ):
             sent += "?"
 
@@ -208,40 +262,73 @@ def _split_to_chunks(text: str) -> List[str]:
     return [c for c in chunks if c.strip()]
 
 
-def _inject_pauses(chunks: List[str], emotion: str, intensity: float) -> List[str]:
+def _inject_pauses(
+    chunks: List[str],
+    emotion: str,
+    intensity: float,
+    tone_arc: str = "steady",
+) -> List[str]:
     """
     Inject ||Xms|| pause markers between chunks.
 
     Pause length scales with:
     - Emotion (grief = long, excitement = short)
-    - Punctuation at end of chunk:
-        "..."  → emotion pause × 1.5
-        "."    → emotion pause × 1.0
-        ","    → emotion pause × 0.4
-        "!" "?"→ emotion pause × 0.6
+    - Punctuation at end of chunk
+    - Delivery arc position (opening/closing = longer, climax = shorter)
+    - Tone arc style (slow_build = progressive, emotional_wave = varying)
     """
     base_ms = get_pause_ms(emotion, intensity)
     result: List[str] = []
+    n = len(chunks)
 
     for i, chunk in enumerate(chunks):
         result.append(chunk)
         if i == len(chunks) - 1:
             break  # no pause after last chunk
 
+        # Arc-based pause multiplier
+        t = i / max(1, n - 1)  # 0.0 = first, 1.0 = last
+        arc_mult = _get_arc_multiplier(t, tone_arc)
+
         last_char = chunk.rstrip()[-1] if chunk.rstrip() else "."
         if chunk.rstrip().endswith("..."):
-            pause_ms = int(base_ms * 1.5)
+            pause_ms = int(base_ms * 1.5 * arc_mult)
         elif last_char == ".":
-            pause_ms = base_ms
+            pause_ms = int(base_ms * arc_mult)
         elif last_char in "!?":
-            pause_ms = int(base_ms * 0.6)
+            pause_ms = int(base_ms * 0.6 * arc_mult)
         elif last_char == ",":
-            pause_ms = int(base_ms * 0.4)
+            pause_ms = int(base_ms * 0.4 * arc_mult)
         else:
-            pause_ms = int(base_ms * 0.8)
+            pause_ms = int(base_ms * 0.8 * arc_mult)
 
-        # Clamp: 80ms min, 900ms max
-        pause_ms = max(80, min(900, pause_ms))
+        # Clamp: 60ms min, 900ms max
+        pause_ms = max(60, min(900, pause_ms))
         result.append(f"||{pause_ms}ms||")
 
     return result
+
+
+def _get_arc_multiplier(t: float, tone_arc: str) -> float:
+    """
+    Return a pause duration multiplier based on position in the delivery arc.
+
+    t: 0.0 = beginning, 1.0 = end
+    """
+    if tone_arc == "slow_build":
+        # Longer pauses at start, shorter as energy builds
+        return 1.3 - 0.6 * t
+    elif tone_arc == "peak_then_fade":
+        # Short at start, then longer as energy fades
+        if t < 0.3:
+            return 0.7
+        return 0.7 + 0.8 * (t - 0.3) / 0.7
+    elif tone_arc == "emotional_wave":
+        # Sinusoidal: alternating between longer and shorter pauses
+        import math
+        return 0.8 + 0.5 * abs(math.sin(t * math.pi * 2))
+    elif tone_arc == "building_urgency":
+        # Progressively shorter pauses (building tension)
+        return 1.2 - 0.7 * t
+    else:  # "steady"
+        return 1.0

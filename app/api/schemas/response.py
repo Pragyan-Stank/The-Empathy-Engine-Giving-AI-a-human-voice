@@ -29,3 +29,9 @@ class SynthesizeResponse(BaseModel):
     sentence_analysis: List[SentenceEmotionItem] = []
     emotion_breakdown: Dict[str, float] = {}   # {"grief": 50.0, "joy": 50.0}
     is_multi_emotion: bool = False
+
+    # Speech performance metadata (from LLM analysis)
+    delivery_style: Optional[str] = None   # casual | empathetic | authoritative | excited
+    tone_arc: Optional[str] = None         # steady | slow_build | peak_then_fade | emotional_wave
+    intent: Optional[str] = None           # informational | empathetic | persuasive | urgent
+    llm_used: bool = False                 # whether LLM analysis was successful

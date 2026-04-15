@@ -3,49 +3,50 @@ Prosody Curve Engine — models human speech dynamics across segments.
 
 CORE CONCEPT:
   Real human speech has a CONSISTENT character (you always know it's the same
-  person speaking) but SUBTLE VARIATION within each phrase/sentence.
+  person speaking) but INTENTIONAL VARIATION within each phrase/sentence.
 
-  This is fundamentally different from either:
-    A) Flat prosody: same rate/pitch for every segment (robotic)
-    B) Per-sentence independent prosody: wild jumps (the bug we fixed)
-
-  Instead:
+  This module computes per-segment prosody by combining:
     Base prosody = emotional character of the whole speech (set at request level)
-    Segment delta = small INTENTIONAL variation per phrase (from LLM analysis)
-    Combined = base + delta, always clamped to Edge TTS safe range
+    Segment delta = intentional variation per phrase (from LLM analysis)
+    Combined = base + delta, always clamped to safe ranges
 
-EXAMPLE (grief speech, 3 segments):
-  Base: rate=-25%, pitch=-15Hz, vol=-10%
+  Supports BOTH Edge TTS (Hz/%) and Google Cloud TTS (rate multiplier/semitones/dB)
+  output formats from the same internal representation.
 
-  Seg1 (most somber opening):
-    Delta: rate=-3%, pitch=-3Hz, pause_before=0ms
-    Result: rate=-28%, pitch=-18Hz   (deeper, slower)
+DELIVERY ARC CONCEPT:
+  Every speech has a natural shape:
+    Opening:  moderate pace, building attention
+    Climax:   peak energy, fastest, most expressive
+    Closing:  slowing, trailing off, reflective
 
-  Seg2 (slight emotional lift):
-    Delta: rate=+4%, pitch=+2Hz, pause_before=500ms
-    Result: rate=-21%, pitch=-13Hz   (breath, then slight shift)
+  The arc_position field on each segment influences how aggressively
+  deltas are applied.
 
-  Seg3 (trailing off):
-    Delta: rate=-2%, pitch=-1Hz, pause_before=300ms
-    Result: rate=-27%, pitch=-16Hz   (trails off at end)
-
-SAFE RANGES (Edge TTS):
-  rate:   -25% to +75%  (total, after applying delta)
-  pitch:  -20Hz to +20Hz
-  volume: -90% to +90%
+SAFE RANGES:
+  Edge TTS:   rate -25% to +75%, pitch -20Hz to +20Hz, volume -90% to +90%
+  Google TTS: rate 0.25x to 4.0x, pitch -20st to +20st, volume -12dB to +12dB
 """
 import math
 import re
 from typing import Dict, List, Optional, Tuple
 
 
-# ── Safe operating ranges for Edge TTS ────────────────────────────────────────
-_RATE_MIN   = -25
-_RATE_MAX   = +75
-_PITCH_MIN  = -20
-_PITCH_MAX  = +20
-_VOL_MIN    = -50
-_VOL_MAX    = +50
+# ── Safe operating ranges ─────────────────────────────────────────────────────
+# Edge TTS
+_EDGE_RATE_MIN   = -25
+_EDGE_RATE_MAX   = +75
+_EDGE_PITCH_MIN  = -20
+_EDGE_PITCH_MAX  = +20
+_EDGE_VOL_MIN    = -50
+_EDGE_VOL_MAX    = +50
+
+# Google Cloud TTS
+_GCLOUD_RATE_MIN   = 0.25
+_GCLOUD_RATE_MAX   = 4.0
+_GCLOUD_PITCH_MIN  = -20.0
+_GCLOUD_PITCH_MAX  = +20.0
+_GCLOUD_VOL_MIN    = -12.0
+_GCLOUD_VOL_MAX    = +12.0
 
 
 def apply_delta(
@@ -66,9 +67,9 @@ def apply_delta(
     base_vol_pct  = _parse_vol_pct(base_prosody.get("volume", "+0%"))
 
     # Apply delta and clamp
-    new_rate  = max(_RATE_MIN,  min(_RATE_MAX,  base_rate_pct  + rate_delta_pct))
-    new_pitch = max(_PITCH_MIN, min(_PITCH_MAX, base_pitch_hz  + pitch_delta_hz))
-    new_vol   = max(_VOL_MIN,   min(_VOL_MAX,   base_vol_pct   + _db_to_pct(volume_delta_db)))
+    new_rate  = max(_EDGE_RATE_MIN,  min(_EDGE_RATE_MAX,  base_rate_pct  + rate_delta_pct))
+    new_pitch = max(_EDGE_PITCH_MIN, min(_EDGE_PITCH_MAX, base_pitch_hz  + pitch_delta_hz))
+    new_vol   = max(_EDGE_VOL_MIN,   min(_EDGE_VOL_MAX,   base_vol_pct   + _db_to_pct(volume_delta_db)))
 
     return {
         "rate":   f"+{new_rate}%"  if new_rate  >= 0 else f"{new_rate}%",
@@ -116,10 +117,84 @@ def edge_tts_format(prosody: Dict[str, str]) -> Tuple[str, str, str]:
     return rate_str, pitch_str, volume_str
 
 
+def google_tts_format(prosody: Dict[str, str]) -> Tuple[float, float, float]:
+    """
+    Convert a prosody dict to Google Cloud TTS audioConfig values.
+
+    Returns (speaking_rate, pitch_semitones, volume_gain_db):
+      - speaking_rate: 0.25 to 4.0 (1.0 = normal)
+      - pitch: -20.0 to +20.0 semitones
+      - volume_gain_db: -12.0 to +12.0 dB
+    """
+    # Rate: percentage → multiplier
+    rate_pct = _parse_rate_pct(prosody.get("rate", "+0%"))
+    rate_mult = round(max(_GCLOUD_RATE_MIN, min(_GCLOUD_RATE_MAX, 1.0 + rate_pct / 100.0)), 2)
+
+    # Pitch: Hz → semitones (approx: 1st ≈ 8.5Hz for speech)
+    pitch_hz = _parse_pitch_hz(prosody.get("pitch", "+0Hz"))
+    # If input is already in semitones, use directly
+    pitch_raw = prosody.get("pitch", "+0Hz")
+    if "st" in str(pitch_raw):
+        try:
+            pitch_st = float(str(pitch_raw).replace("st", "").replace("+", ""))
+        except Exception:
+            pitch_st = pitch_hz / 8.5
+    else:
+        pitch_st = pitch_hz / 8.5
+    pitch_st = round(max(_GCLOUD_PITCH_MIN, min(_GCLOUD_PITCH_MAX, pitch_st)), 1)
+
+    # Volume: percentage → dB
+    vol_pct = _parse_vol_pct(prosody.get("volume", "+0%"))
+    # If input is already in dB, use directly
+    vol_raw = prosody.get("volume", "+0%")
+    if "dB" in str(vol_raw):
+        try:
+            vol_db = float(str(vol_raw).replace("dB", "").replace("+", ""))
+        except Exception:
+            vol_db = _pct_to_db(vol_pct)
+    else:
+        vol_db = _pct_to_db(vol_pct)
+    vol_db = round(max(_GCLOUD_VOL_MIN, min(_GCLOUD_VOL_MAX, vol_db)), 1)
+
+    return rate_mult, pitch_st, vol_db
+
+
+def google_tts_format_from_deltas(
+    base_prosody: Dict[str, str],
+    rate_delta_pct: int = 0,
+    pitch_delta_hz: int = 0,
+    volume_delta_db: float = 0.0,
+) -> Tuple[float, float, float]:
+    """
+    Directly compute Google TTS values from base prosody + deltas.
+    More accurate than going through the Edge TTS intermediate format.
+
+    Returns (speaking_rate, pitch_semitones, volume_gain_db).
+    """
+    # Parse base from the prosody dict (handles both st/Hz and %/dB formats)
+    base_rate = _parse_rate_pct(base_prosody.get("rate", "default"))
+    base_pitch = _parse_pitch_st(base_prosody.get("pitch", "default"))
+    base_vol = _parse_vol_db(base_prosody.get("volume", "default"))
+
+    # Apply deltas
+    new_rate_pct = base_rate + rate_delta_pct
+    new_pitch_st = base_pitch + (pitch_delta_hz / 8.5)
+    new_vol_db   = base_vol + volume_delta_db
+
+    # Clamp to Google TTS ranges
+    rate_mult = round(max(_GCLOUD_RATE_MIN, min(_GCLOUD_RATE_MAX, 1.0 + new_rate_pct / 100.0)), 2)
+    pitch_st  = round(max(_GCLOUD_PITCH_MIN, min(_GCLOUD_PITCH_MAX, new_pitch_st)), 1)
+    vol_db    = round(max(_GCLOUD_VOL_MIN, min(_GCLOUD_VOL_MAX, new_vol_db)), 1)
+
+    return rate_mult, pitch_st, vol_db
+
+
 # ── Parsers ────────────────────────────────────────────────────────────────────
 
 def _parse_rate_pct(r: str) -> int:
-    """Parse "+20%" or "-25%" → integer percentage."""
+    """Parse "+20%" or "-25%" or "default" → integer percentage."""
+    if r in ("default", None, ""):
+        return 0
     try:
         return int(float(r.replace("%", "").replace("+", "")))
     except Exception:
@@ -128,20 +203,54 @@ def _parse_rate_pct(r: str) -> int:
 
 def _parse_pitch_hz(p: str) -> int:
     """Parse "+0Hz"  or "-15Hz" or "-2.0st" → integer Hz."""
+    if p in ("default", None, ""):
+        return 0
     try:
         if "Hz" in p:
             return int(float(p.replace("Hz", "").replace("+", "")))
         elif "st" in p:
             # semitones → Hz (1st ≈ 8.5Hz for speech)
             st = float(p.replace("st", "").replace("+", ""))
-            return max(_PITCH_MIN, min(_PITCH_MAX, round(st * 8.5)))
+            return max(_EDGE_PITCH_MIN, min(_EDGE_PITCH_MAX, round(st * 8.5)))
         return 0
     except Exception:
         return 0
 
 
+def _parse_pitch_st(p: str) -> float:
+    """Parse pitch value → semitones (float)."""
+    if p in ("default", None, ""):
+        return 0.0
+    try:
+        if "st" in p:
+            return float(p.replace("st", "").replace("+", ""))
+        elif "Hz" in p:
+            hz = float(p.replace("Hz", "").replace("+", ""))
+            return hz / 8.5
+        return 0.0
+    except Exception:
+        return 0.0
+
+
+def _parse_vol_db(v: str) -> float:
+    """Parse volume value → dB (float)."""
+    if v in ("default", None, ""):
+        return 0.0
+    try:
+        if "dB" in v:
+            return float(v.replace("dB", "").replace("+", ""))
+        elif "%" in v:
+            pct = float(v.replace("%", "").replace("+", ""))
+            return _pct_to_db(int(pct))
+        return 0.0
+    except Exception:
+        return 0.0
+
+
 def _parse_vol_pct(v: str) -> int:
     """Parse "+0%" or "-29%" or "-3.0dB" → integer percentage."""
+    if v in ("default", None, ""):
+        return 0
     try:
         if "%" in v:
             return int(float(v.replace("%", "").replace("+", "")))
@@ -162,24 +271,35 @@ def _db_to_pct(db: float) -> int:
         return 0
 
 
+def _pct_to_db(pct: int) -> float:
+    """Convert percentage gain to approximate dB."""
+    try:
+        if pct <= -100:
+            return -96.0
+        ratio = 1.0 + pct / 100.0
+        if ratio <= 0:
+            return -96.0
+        return round(20 * math.log10(ratio), 1)
+    except Exception:
+        return 0.0
+
+
 def _normalise_rate(r: str) -> str:
     """Ensure rate is in Edge TTS format (percentage string) within safe range."""
     pct = _parse_rate_pct(r)
-    pct = max(_RATE_MIN, min(_RATE_MAX, pct))
-    # If input looks like it was already a percentage string, just reclamp
-    # If it looked like a multiplier (e.g. "1.2"), convert
+    pct = max(_EDGE_RATE_MIN, min(_EDGE_RATE_MAX, pct))
     return f"+{pct}%" if pct >= 0 else f"{pct}%"
 
 
 def _normalise_pitch(p: str) -> str:
     """Ensure pitch is in Edge TTS Hz format within safe range."""
     hz = _parse_pitch_hz(p)
-    hz = max(_PITCH_MIN, min(_PITCH_MAX, hz))
+    hz = max(_EDGE_PITCH_MIN, min(_EDGE_PITCH_MAX, hz))
     return f"+{hz}Hz" if hz >= 0 else f"{hz}Hz"
 
 
 def _normalise_volume(v: str) -> str:
     """Ensure volume is in Edge TTS percentage format within safe range."""
     pct = _parse_vol_pct(v)
-    pct = max(_VOL_MIN, min(_VOL_MAX, pct))
+    pct = max(_EDGE_VOL_MIN, min(_EDGE_VOL_MAX, pct))
     return f"+{pct}%" if pct >= 0 else f"{pct}%"

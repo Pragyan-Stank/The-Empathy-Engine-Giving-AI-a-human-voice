@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import health, synthesize, audio_serve
+from app.api.routes import health, synthesize, audio_serve, stream
 from app.core.exceptions import EmpathyEngineException, custom_exception_handler
 from app.core.logging_config import logger, request_id_var
 
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api/v1", tags=["system"])
     app.include_router(synthesize.router, prefix="/api/v1", tags=["speech"])
     app.include_router(audio_serve.router, prefix="/api/v1", tags=["audio"])
+    app.include_router(stream.router, prefix="/api/v1", tags=["streaming"])
 
     # Exception Handling
     app.add_exception_handler(EmpathyEngineException, custom_exception_handler)

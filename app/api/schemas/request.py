@@ -4,8 +4,8 @@ from typing import Optional
 
 class SynthesizeRequest(BaseModel):
     text: str = Field(
-        ..., min_length=1, max_length=500,
-        description="Input text (max 500 characters)"
+        ..., min_length=1, max_length=2000,
+        description="Input text (max 2000 characters)"
     )
     emotion_override: Optional[str] = Field(
         None, description="Force a specific emotion (joy, sadness, anger, fear, surprise, neutral)"

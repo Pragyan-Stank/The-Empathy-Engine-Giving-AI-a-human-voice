@@ -23,14 +23,17 @@ Features:
        - Joy: moderate emphasis, bright cadence
        - Anxiety: whispering emphasis, longer hesitation breaks
 
-  5. build_ssml_engine(text, prosody, emotion) — used by TTS engines
-     build_ssml_display(text, prosody, emotion) — for UI preview
+  5. COMPOSITE SSML for multi-segment synthesis:
+     build_composite_ssml() — produces a single <speak> with per-segment
+     <prosody> wrappers and inter-segment <break> tags, enabling
+     tone transitions within a single response.
 
-  6. build_segment_ssml(segment_text, prosody, emotion) — single segment
-     with full prosody wrapper, used by multi-sentence synthesis.
+  6. build_ssml_engine(text, prosody, emotion) — used by TTS engines
+     build_ssml_display(text, prosody, emotion) — for UI preview
+     build_segment_ssml(segment_text, prosody, emotion) — single segment
 """
 import re
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 # ── Pause map for punctuation ──────────────────────────────────────────────────
@@ -143,6 +146,121 @@ class SSMLBuilder:
         if wrapper:
             inner = f'<prosody {wrapper}>{inner}</prosody>'
         return f"<speak>{inner}</speak>"
+
+    def build_composite_ssml(
+        self,
+        segments: List[Dict],
+        emotion: str = "neutral",
+    ) -> str:
+        """
+        Build a SINGLE composite <speak> with per-segment <prosody> wrappers.
+
+        This is the key to achieving tone transitions within a single TTS call.
+        Google Cloud TTS processes this as one synthesis request but applies
+        different prosody to each segment.
+
+        Args:
+            segments: list of dicts with keys:
+                - text: segment text
+                - rate: speaking rate (e.g. "1.1" for Google, "+10%" for display)
+                - pitch: pitch in semitones (e.g. "+2.0st")
+                - volume: volume gain (e.g. "+3.0dB")
+                - pause_before_ms: pause before this segment in ms
+                - emotion: segment-level emotion
+                - emphasis_words: list of words to emphasize
+            emotion: overall emotion for emphasis decisions
+
+        Returns:
+            Complete <speak> SSML string with per-segment prosody.
+        """
+        parts = []
+
+        for i, seg in enumerate(segments):
+            seg_text = seg.get("text", "")
+            if not seg_text.strip():
+                continue
+
+            seg_emotion = seg.get("emotion", emotion)
+            emphasis_words = seg.get("emphasis_words", [])
+
+            # Build inner content with emphasis and punctuation breaks
+            inner = self._build_inner(seg_text, seg_emotion, extra_emphasis=emphasis_words)
+
+            # Insert inter-segment pause
+            pause_ms = seg.get("pause_before_ms", 0)
+            if pause_ms > 0 and i > 0:
+                parts.append(f'<break time="{pause_ms}ms"/>')
+
+            # Wrap with per-segment prosody
+            rate = seg.get("rate", "")
+            pitch = seg.get("pitch", "")
+            volume = seg.get("volume", "")
+
+            prosody_attrs = self._build_prosody_attrs(rate, pitch, volume)
+            if prosody_attrs:
+                parts.append(f'<prosody {prosody_attrs}>{inner}</prosody>')
+            else:
+                parts.append(inner)
+
+        return f"<speak>{' '.join(parts)}</speak>"
+
+    def build_google_composite_ssml(
+        self,
+        segments: List[Dict],
+        emotion: str = "neutral",
+    ) -> str:
+        """
+        Build composite SSML specifically optimized for Google Cloud TTS.
+
+        Uses Google's SSML-compatible prosody attributes:
+          - rate: "x-slow" / "slow" / "medium" / "fast" / "x-fast" / percentage
+          - pitch: "+Xst" / "-Xst" / "x-low" / "low" / "medium" / "high" / "x-high"
+          - volume: "+XdB" / "-XdB" / "silent" / "x-soft" / "soft" / "medium" / "loud"
+
+        Google TTS processes this as a single synthesis call, applying different
+        prosody per segment for natural tone transitions.
+        """
+        parts = []
+
+        for i, seg in enumerate(segments):
+            seg_text = seg.get("text", "")
+            if not seg_text.strip():
+                continue
+
+            seg_emotion = seg.get("emotion", emotion)
+            emphasis_words = seg.get("emphasis_words", [])
+
+            inner = self._build_inner(seg_text, seg_emotion, extra_emphasis=emphasis_words)
+
+            # Inter-segment pause
+            pause_ms = seg.get("pause_before_ms", 0)
+            if pause_ms > 0 and i > 0:
+                parts.append(f'<break time="{pause_ms}ms"/>')
+
+            # Google-format prosody
+            rate_mult = seg.get("rate_mult", 1.0)
+            pitch_st = seg.get("pitch_st", 0.0)
+            vol_db = seg.get("vol_db", 0.0)
+
+            attrs = []
+            if rate_mult != 1.0:
+                # Google accepts percentage: "+20%" means 20% faster
+                rate_pct = round((rate_mult - 1.0) * 100)
+                rate_str = f"+{rate_pct}%" if rate_pct >= 0 else f"{rate_pct}%"
+                attrs.append(f'rate="{rate_str}"')
+            if abs(pitch_st) > 0.1:
+                pitch_str = f"+{pitch_st}st" if pitch_st >= 0 else f"{pitch_st}st"
+                attrs.append(f'pitch="{pitch_str}"')
+            if abs(vol_db) > 0.1:
+                vol_str = f"+{vol_db}dB" if vol_db >= 0 else f"{vol_db}dB"
+                attrs.append(f'volume="{vol_str}"')
+
+            if attrs:
+                parts.append(f'<prosody {" ".join(attrs)}>{inner}</prosody>')
+            else:
+                parts.append(inner)
+
+        return f"<speak>{' '.join(parts)}</speak>"
 
     # Backward-compatible alias
     def build_ssml(self, text: str, prosody: Dict[str, str]) -> str:
@@ -262,5 +380,16 @@ class SSMLBuilder:
         if pitch not in ("default", "0st", "", None):
             attrs.append(f'pitch="{pitch}"')
         if volume not in ("default", "0dB", "", None):
+            attrs.append(f'volume="{volume}"')
+        return " ".join(attrs)
+
+    def _build_prosody_attrs(self, rate: str, pitch: str, volume: str) -> str:
+        """Build prosody attribute string from individual values."""
+        attrs = []
+        if rate and rate not in ("default", "0", "0%", "+0%"):
+            attrs.append(f'rate="{rate}"')
+        if pitch and pitch not in ("default", "0", "0st", "+0st", "0Hz", "+0Hz"):
+            attrs.append(f'pitch="{pitch}"')
+        if volume and volume not in ("default", "0", "0dB", "+0dB", "0%", "+0%"):
             attrs.append(f'volume="{volume}"')
         return " ".join(attrs)

@@ -1,10 +1,20 @@
 """
-POST /api/v1/synthesize — full emotion-aware synthesis pipeline.
+POST /api/v1/synthesize — full emotion-aware speech performance pipeline.
+
+Architecture:
+  Input
+  → LLM (emotion + intent detection + delivery arc)
+  → Text Humanization (Indian rhythm, punctuation, chunking)
+  → Prosody Engine (per-segment dynamic prosody)
+  → SSML Generator (composite multi-segment with per-segment <prosody>)
+  → Google TTS / Edge TTS / ElevenLabs (with segment deltas)
+  → Audio Post-processing (de-essing, 3-band EQ, compression, reverb)
+  → Output
 
 TTS provider chain (in priority order):
   1. ElevenLabs    — expressive neural, emotion-mapped voice settings (PRIMARY)
-  2. Google Cloud  — SSML+audioConfig prosody (if API enabled)
-  3. Edge TTS      — free Microsoft neural voices, rate/pitch/volume
+  2. Google Cloud  — SSML+audioConfig prosody + composite SSML for tone transitions
+  3. Edge TTS      — free Microsoft neural voices, rate/pitch/volume + emotion styles
   4. pyttsx3       — offline SAPI5 fallback (rate + volume only)
 
 Emotion detection chain:
@@ -95,11 +105,12 @@ async def _synthesize_audio(
         except TTSGenerationError as e:
             logger.error(f"ElevenLabs failed ({e}). Trying Google TTS.")
 
-    # 2 — Google Cloud TTS (SSML + audioConfig prosody)
+    # 2 — Google Cloud TTS (SSML + audioConfig prosody + composite SSML)
     if _google_tts.available:
         try:
             return await _google_tts.synthesize(
-                text, engine_ssml, filepath, prosody, emotion=emotion
+                text, engine_ssml, filepath, prosody, emotion=emotion,
+                segment_deltas=segment_deltas,
             )
         except TTSGenerationError as e:
             logger.error(f"Google TTS failed ({e}). Trying Expressive Edge TTS.")
@@ -178,19 +189,22 @@ async def synthesize_speech(request: SynthesizeRequest):
                 emotion_label = vader_emotion
                 confidence    = vader_conf
 
-        # Step 4 — Prosody from emotion \u00d7 intensity
+        # Step 4 — Prosody from emotion × intensity
         prosody = calculate_prosody(emotion_label, request.intensity)
         logger.info(f"Auto prosody: {prosody}")
 
         # Step 4.5 — LLM Speech Analysis (Groq)
         # Rewrites text into natural spoken form and produces per-segment prosody deltas.
-        # Falls back gracefully (< 4s timeout) so synthesis is never blocked.
+        # Also provides: delivery_style, tone_arc, intent for downstream processing.
+        # Falls back gracefully (<6s timeout) so synthesis is never blocked.
         speech_analysis: SpeechAnalysis = await analyze_speech(
             clean_text, emotion_label, request.intensity
         )
         logger.info(
             f"Speech analysis: llm={speech_analysis.llm_used}, "
             f"style={speech_analysis.delivery_style}, "
+            f"arc={speech_analysis.tone_arc}, "
+            f"intent={speech_analysis.intent}, "
             f"segments={len(speech_analysis.segments)}"
         )
 
@@ -215,12 +229,12 @@ async def synthesize_speech(request: SynthesizeRequest):
                 f"emotions: {unique_emotions}"
             )
 
-        # Step 7 — Text Enhancement (punctuation injection + chunking)
+        # Step 7 — Text Enhancement (punctuation injection + chunking + Indian rhythm)
         # CRITICAL: Always use FULL clean_text as the TTS source.
-        # LLM humanized_text is capped at 800 chars by the token budget —
-        # using it for long texts silently drops everything after ~800 chars.
+        # LLM humanized_text is capped at 1200 chars by the token budget —
+        # using it for long texts silently drops everything after ~1200 chars.
         # LLM value for long texts = segment_deltas + emphasis_words, NOT text rewriting.
-        SHORT_TEXT_LIMIT = 600  # safe: LLM saw the whole text within this limit
+        SHORT_TEXT_LIMIT = 800  # increased from 600 — LLM now has more token budget
         if (
             speech_analysis.llm_used
             and speech_analysis.humanized_text
@@ -236,7 +250,10 @@ async def synthesize_speech(request: SynthesizeRequest):
                     "LLM prosody deltas + emphasis still applied"
                 )
 
-        enhanced_text = enhance_text(base_for_tts, emotion_label, request.intensity)
+        enhanced_text = enhance_text(
+            base_for_tts, emotion_label, request.intensity,
+            tone_arc=speech_analysis.tone_arc,
+        )
         tts_text = re.sub(r"(?<=[.!?,])\s*\|\|\d+ms\|\|\s*", " ", enhanced_text)
         tts_text = re.sub(r"\|\|\d+ms\|\|", ", ", tts_text).strip()
         logger.info(f"Text enhanced: {len(clean_text)}→{len(tts_text)} chars")
@@ -249,6 +266,8 @@ async def synthesize_speech(request: SynthesizeRequest):
                 "volume_delta_db": s.volume_delta_db,
                 "pause_before_ms": s.pause_before_ms,
                 "emotion":         s.emotion,
+                "emphasis_words":  s.emphasis_words,
+                "arc_position":    s.arc_position,
             }
             for s in speech_analysis.segments
         ]
@@ -280,7 +299,7 @@ async def synthesize_speech(request: SynthesizeRequest):
             )
             logger.info(f"Audio saved: {final_path}")
 
-            # Step 11 — Post-processing (EQ, reverb, compression)
+            # Step 11 — Post-processing (de-essing, 3-band EQ, compression, reverb)
             final_path = process_audio(final_path, emotion_label, request.intensity)
             logger.info(f"Post-processing complete: {final_path}")
 
@@ -304,6 +323,10 @@ async def synthesize_speech(request: SynthesizeRequest):
             sentence_analysis=sentence_items,
             emotion_breakdown=emotion_breakdown,
             is_multi_emotion=is_multi,
+            delivery_style=speech_analysis.delivery_style,
+            tone_arc=speech_analysis.tone_arc,
+            intent=speech_analysis.intent,
+            llm_used=speech_analysis.llm_used,
         )
 
     except HTTPException:
