@@ -62,6 +62,7 @@ class GoogleCloudTTS(TTSEngine):
         ssml: str,
         filepath: str,
         prosody: Dict[str, str],
+        emotion: str = "neutral",
     ) -> str:
         if not self.available:
             raise TTSGenerationError("Google TTS API key not configured.")
@@ -99,6 +100,13 @@ class GoogleCloudTTS(TTSEngine):
                 if response.status_code != 200:
                     detail = response.text
                     logger.error(f"Google TTS API error {response.status_code}: {detail}")
+                    # 403 = API not enabled or billing disabled — mark permanently unavailable
+                    if response.status_code in (401, 403):
+                        self.available = False
+                        logger.warning(
+                            "Google TTS permanently disabled for this session "
+                            f"(HTTP {response.status_code}). Will use next provider."
+                        )
                     raise TTSGenerationError(f"Google TTS returned {response.status_code}: {detail}")
 
                 data = response.json()

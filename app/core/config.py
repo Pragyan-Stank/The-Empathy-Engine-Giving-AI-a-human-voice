@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: Optional[str] = None
     HF_TOKEN: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
+    ELEVEN_LABS: Optional[str] = None  # ElevenLabs TTS API key
     
     # Output Directory
     OUTPUT_AUDIO_DIR: str = "output_audio"

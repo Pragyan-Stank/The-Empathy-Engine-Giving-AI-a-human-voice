@@ -74,6 +74,7 @@ class EdgeTTSEngine(TTSEngine):
         ssml: str,
         filepath: str,
         prosody: Dict[str, str],
+        emotion: str = "neutral",
     ) -> str:
         if not self.available:
             raise TTSGenerationError("edge-tts library not installed.")

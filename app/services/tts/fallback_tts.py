@@ -59,6 +59,7 @@ class FallbackTTS(TTSEngine):
         ssml: str,
         filepath: str,
         prosody: Dict[str, str],
+        emotion: str = "neutral",
     ) -> str:
         wpm = _parse_rate_to_wpm(prosody.get("rate", "default"))
         vol = _parse_volume_to_float(prosody.get("volume", "default"))

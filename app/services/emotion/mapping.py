@@ -1,65 +1,106 @@
 from typing import Dict, Any
 
-# Map descriptive labels to a standardized base emotion
+# ── Emotion Aliases → canonical labels ────────────────────────────────────────
 EMOTION_ALIASES = {
-    "happy": "joy",
-    "joy": "joy",
-    "positive": "joy",
-    
-    "sad": "sadness",
-    "sadness": "sadness",
-    
-    "anger": "anger",
-    "angry": "anger",
-    "frustrated": "anger",
-    
-    "fear": "fear",
-    "anxiety": "fear",
-    
-    "surprise": "surprise",
-    
-    "neutral": "neutral",
-    "calm": "neutral",
+    # Base positives
+    "happy":       "joy",
+    "joy":         "joy",
+    "positive":    "joy",
+    # Granular positives
+    "excitement":  "excitement",
+    "excited":     "excitement",
+    "contentment": "contentment",
+    "content":     "contentment",
+    "calm":        "contentment",
+    # Sadness family
+    "sad":         "sadness",
+    "sadness":     "sadness",
+    "grief":       "grief",
+    "grieving":    "grief",
+    # Anger family
+    "anger":       "anger",
+    "angry":       "anger",
+    "frustration": "frustration",
+    "frustrated":  "frustration",
+    "rage":        "rage",
+    "furious":     "rage",
+    # Fear family
+    "fear":        "fear",
+    "anxiety":     "anxiety",
+    "anxious":     "anxiety",
+    "nervous":     "anxiety",
+    # Others
+    "surprise":    "surprise",
+    "surprised":   "surprise",
+    "disgust":     "disgust",
+    "disgusted":   "disgust",
+    "neutral":     "neutral",
 }
 
-# The 'voice style' rules (Base Mapping)
+# ── Prosody Map (rate/pitch/volume deltas per canonical emotion) ───────────────
+# Values are base deltas scaled later by intensity (0.0–1.0).
+# rate_delta:   fraction of base WPM (e.g. 0.2 = +20%)
+# pitch_shift:  semitones relative to default (e.g. +2 st)
+# volume_delta: dB relative to default          (e.g. +2 dB)
 PROSODY_MAP = {
+    # ── Positives ─────────────────────────────────────────────────────────
     "joy": {
-        "rate_delta": 0.2,       # +20%
-        "pitch_shift": 2,        # +2 st
-        "volume_delta": 2.0      # +2dB
+        "rate_delta": 0.20,   "pitch_shift": 2.0,  "volume_delta":  2.0,
     },
+    "excitement": {
+        "rate_delta": 0.45,   "pitch_shift": 5.0,  "volume_delta":  4.0,
+    },
+    "contentment": {
+        "rate_delta": -0.05,  "pitch_shift": 1.0,  "volume_delta": -1.0,
+    },
+    # ── Sadness family ───────────────────────────────────────────────────
     "sadness": {
-        "rate_delta": -0.2,      # -20%
-        "pitch_shift": -2,       # -2 st
-        "volume_delta": -2.0     # -2dB
+        "rate_delta": -0.20,  "pitch_shift": -2.0, "volume_delta": -2.0,
     },
+    "grief": {
+        "rate_delta": -0.35,  "pitch_shift": -3.5, "volume_delta": -3.5,
+    },
+    # ── Anger family ──────────────────────────────────────────────────────
     "anger": {
-        "rate_delta": 0.3,       # +30%
-        "pitch_shift": 4,        # +4 st
-        "volume_delta": 4.0      # +4dB
+        "rate_delta": 0.30,   "pitch_shift": 4.0,  "volume_delta":  4.0,
     },
+    "frustration": {
+        "rate_delta": 0.15,   "pitch_shift": 2.0,  "volume_delta":  2.5,
+    },
+    "rage": {
+        "rate_delta": 0.50,   "pitch_shift": 6.0,  "volume_delta":  5.5,
+    },
+    # ── Fear family ───────────────────────────────────────────────────────
     "fear": {
-        "rate_delta": 0.1,       # +10%
-        "pitch_shift": 3,        # +3 st
-        "volume_delta": 1.0      # +1dB
+        "rate_delta": 0.10,   "pitch_shift": 3.0,  "volume_delta":  1.0,
     },
+    "anxiety": {
+        "rate_delta": 0.20,   "pitch_shift": 3.5,  "volume_delta":  1.5,
+    },
+    # ── Other ──────────────────────────────────────────────────────────────
     "surprise": {
-        "rate_delta": 0.4,       # +40%
-        "pitch_shift": 5,        # +5 st
-        "volume_delta": 0.0      # 0dB
+        "rate_delta": 0.40,   "pitch_shift": 5.0,  "volume_delta":  0.0,
+    },
+    "disgust": {
+        "rate_delta": 0.05,   "pitch_shift": -1.0, "volume_delta":  1.0,
     },
     "neutral": {
-        "rate_delta": 0.0,       
-        "pitch_shift": 0,        
-        "volume_delta": 0.0      
-    }
+        "rate_delta": 0.00,   "pitch_shift": 0.0,  "volume_delta":  0.0,
+    },
 }
 
-def get_base_emotion(label: str) -> str:
-    lbl = label.lower().strip()
-    return EMOTION_ALIASES.get(lbl, "neutral")
+
+def get_canonical_emotion(label: str) -> str:
+    """Resolve any alias or variant to a canonical label."""
+    return EMOTION_ALIASES.get(label.lower().strip(), "neutral")
+
 
 def get_prosody_base(emotion: str) -> Dict[str, float]:
-    base = get_base_emotion(emotion)
-    return PROSODY_MAP.get(base, PROSODY_MAP["neutral"])
+    """Return the base prosody deltas for an emotion (resolved through aliases)."""
+    canonical = get_canonical_emotion(emotion)
+    return PROSODY_MAP.get(canonical, PROSODY_MAP["neutral"])
+
+
+# ── Legacy compatibility ───────────────────────────────────────────────────────
+def get_base_emotion(label: str) -> str:
+    return get_canonical_emotion(label)
