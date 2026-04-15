@@ -25,7 +25,6 @@ import edge_tts.communicate as _edge_comm
 from app.services.tts.base import TTSEngine
 from app.core.exceptions import TTSGenerationError
 from app.core.logging_config import logger
-from app.services.emotion.intensity import calculate_prosody
 from app.services.emotion.sentence_analysis import (
     analyze_text, detect_sentence_emotion, split_sentences
 )
@@ -208,27 +207,34 @@ class ExpressiveEdgeTTS(TTSEngine):
             except Exception as e:
                 raise TTSGenerationError(f"ExpressiveEdgeTTS single-sentence error: {e}")
 
-        # ── Multi-sentence: per-sentence emotion ───────────────────────────
+        # ── Multi-sentence: per-sentence emotion, shared prosody ──────────
+        # Style (cheerful / sad / angry…) changes per sentence so the voice
+        # feels emotionally responsive.  Rate / pitch / volume are kept
+        # consistent across all segments so the overall speech tempo and
+        # loudness don't jump between sentences.
         logger.info(
             f"Multi-sentence mode: {len(sentences)} sentences — "
-            "per-sentence emotion detection active"
+            "per-sentence emotion detection active (shared rate/pitch/volume)"
         )
 
         temp_paths = []
         for i, sentence in enumerate(sentences):
             s_emotion, _ = detect_sentence_emotion(sentence)
-            s_prosody = calculate_prosody(s_emotion, 1.0)
             temp = filepath.replace(".mp3", f"__seg{i}.mp3")
             temp_paths.append(temp)
 
             logger.info(
                 f"  Seg {i+1}/{len(sentences)}: "
                 f"'{sentence[:60]}{'...' if len(sentence)>60 else ''}' "
-                f"→ emotion={s_emotion}"
+                f"→ emotion={s_emotion} | "
+                f"rate={prosody.get('rate','default')} "
+                f"pitch={prosody.get('pitch','default')} "
+                f"vol={prosody.get('volume','default')}"
             )
 
             try:
-                await self._synth_sentence(sentence, temp, s_emotion, s_prosody)
+                # Pass the top-level prosody so rate/pitch/volume stay uniform
+                await self._synth_sentence(sentence, temp, s_emotion, prosody)
             except Exception as e:
                 logger.error(f"  Seg {i+1} synthesis failed: {e}. Skipping.")
 
