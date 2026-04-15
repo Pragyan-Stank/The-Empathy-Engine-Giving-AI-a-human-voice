@@ -19,7 +19,7 @@ import os
 from fastapi import APIRouter, HTTPException
 
 from app.api.schemas.request import SynthesizeRequest
-from app.api.schemas.response import SynthesizeResponse, ProsodyResponse
+from app.api.schemas.response import SynthesizeResponse, ProsodyResponse, SentenceEmotionItem
 from app.core.config import settings
 from app.core.logging_config import logger
 from app.core.exceptions import TTSGenerationError
@@ -28,6 +28,9 @@ from app.services.emotion.transformer_model import TransformerEmotionAnalyzer
 from app.services.emotion.sentiment_fallback import VaderSentimentFallback
 from app.services.emotion.granular import refine_emotion
 from app.services.emotion.intensity import calculate_prosody
+from app.services.emotion.sentence_analysis import (
+    analyze_text, build_emotion_breakdown, split_sentences
+)
 from app.services.tts.ssml_builder import SSMLBuilder
 from app.services.tts.elevenlabs_tts import ElevenLabsTTS
 from app.services.tts.google_tts import GoogleCloudTTS
@@ -146,9 +149,28 @@ async def synthesize_speech(request: SynthesizeRequest):
         # Step 3 — Granular refinement (rule-based sub-emotion)
         emotion_label = refine_emotion(clean_text, base_emotion)
         if emotion_label != base_emotion:
-            logger.info(f"Refined: {base_emotion} → {emotion_label}")
+            logger.info(f"Refined: {base_emotion} \u2192 {emotion_label}")
 
-        # Step 4 — Prosody from emotion × intensity
+        # Step 3b — Cross-validation: when transformer confidence is low,
+        # compare its polarity against VADER. If they disagree, prefer VADER.
+        # Prevents false positives like 'yes, why not!' \u2192 anger at 50%.
+        if not request.emotion_override and confidence < 0.65:
+            _NEG = {"anger","frustration","rage","disgust","sadness","grief","fear","anxiety"}
+            _POS = {"joy","excitement","contentment","surprise"}
+            from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer as _VI
+            _cmp = _VI().polarity_scores(clean_text)["compound"]
+            transformer_pol = "neg" if emotion_label in _NEG else ("pos" if emotion_label in _POS else "neu")
+            vader_pol       = "pos" if _cmp > 0.15 else ("neg" if _cmp < -0.15 else "neu")
+            if transformer_pol != vader_pol and vader_pol != "neu":
+                vader_emotion, vader_conf = _vader.analyze(clean_text)
+                logger.info(
+                    f"Cross-validation: transformer={emotion_label}({confidence:.0%}) conflicts "
+                    f"with VADER polarity ({vader_pol}); overriding \u2192 {vader_emotion}"
+                )
+                emotion_label = vader_emotion
+                confidence    = vader_conf
+
+        # Step 4 — Prosody from emotion \u00d7 intensity
         prosody = calculate_prosody(emotion_label, request.intensity)
         logger.info(f"Auto prosody: {prosody}")
 
@@ -162,11 +184,22 @@ async def synthesize_speech(request: SynthesizeRequest):
         if any([request.rate_override, request.pitch_override, request.volume_override]):
             logger.info(f"After overrides: {prosody}")
 
-        # Step 6 — SSML generation
+        # Step 6 — Per-sentence analysis (for breakdown + multi-emotion TTS)
+        sentence_results = analyze_text(clean_text)
+        emotion_breakdown = build_emotion_breakdown(sentence_results)
+        is_multi = len(sentence_results) > 1
+        if is_multi:
+            unique_emotions = list(emotion_breakdown.keys())
+            logger.info(
+                f"Multi-emotion text — {len(sentence_results)} sentences, "
+                f"emotions: {unique_emotions}"
+            )
+
+        # Step 7 — SSML generation
         engine_ssml  = _ssml_builder.build_ssml_engine(clean_text)
         display_ssml = _ssml_builder.build_ssml_display(clean_text, prosody)
 
-        # Step 7 — Cache check (prosody included in key)
+        # Step 8 — Cache key (prosody + emotion breakdown)
         filename = _storage.generate_filename(
             clean_text, emotion_label, request.intensity,
             prosody=prosody, extension="mp3",
@@ -177,7 +210,7 @@ async def synthesize_speech(request: SynthesizeRequest):
             final_path = base_filepath
             logger.info(f"Cache hit: {filename}")
         else:
-            # Step 8 — Synthesize
+            # Step 9 — Synthesize
             final_path = await _synthesize_audio(
                 clean_text, engine_ssml, base_filepath, prosody, emotion_label
             )
@@ -185,6 +218,11 @@ async def synthesize_speech(request: SynthesizeRequest):
 
         final_filename = os.path.basename(final_path)
         audio_url = f"/api/v1/audio/{final_filename}"
+
+        sentence_items = [
+            SentenceEmotionItem(text=r.text, emotion=r.emotion, style=r.style)
+            for r in sentence_results
+        ]
 
         return SynthesizeResponse(
             success=True,
@@ -195,6 +233,9 @@ async def synthesize_speech(request: SynthesizeRequest):
             prosody=ProsodyResponse(**prosody),
             audio_url=audio_url,
             ssml_preview=display_ssml,
+            sentence_analysis=sentence_items,
+            emotion_breakdown=emotion_breakdown,
+            is_multi_emotion=is_multi,
         )
 
     except HTTPException:

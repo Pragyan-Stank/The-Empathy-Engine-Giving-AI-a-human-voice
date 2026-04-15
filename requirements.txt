@@ -13,3 +13,4 @@ python-dotenv
 pytest
 httpx
 edge-tts
+elevenlabs

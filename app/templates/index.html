@@ -29,7 +29,7 @@
                             id="text-input"
                             rows="5"
                             maxlength="500"
-                            placeholder="e.g. "This is the best news I've heard all year!""
+                            placeholder="e.g. &quot;I lost my dog today. LOL, it was a toy dog, not a real one!&quot;"
                             required
                         ></textarea>
                         <div class="char-count"><span id="char-count">0</span> / 500</div>
@@ -120,9 +120,10 @@
                     <span class="badge" id="sentiment-badge"></span>
                 </div>
 
-                <div class="metrics-row">
+                <!-- Top metrics -->
+                <div class="metrics-row" id="metrics-single">
                     <div class="metric">
-                        <span class="metric-label">Detected Emotion</span>
+                        <span class="metric-label">Dominant Emotion</span>
                         <span class="metric-value capitalize" id="res-emotion">—</span>
                     </div>
                     <div class="metric">
@@ -136,6 +137,24 @@
                 </div>
 
                 <div class="divider"></div>
+
+                <!-- ── Emotion Breakdown ──────────────────────── -->
+                <div id="emotion-breakdown-section">
+                    <div class="section-label breakdown-label">Emotion Breakdown</div>
+                    <div id="emotion-breakdown-bars"></div>
+                </div>
+
+                <div class="divider" id="breakdown-divider"></div>
+
+                <!-- ── Per-sentence Analysis ─────────────────── -->
+                <div id="sentence-analysis-section" class="hidden">
+                    <div class="section-label breakdown-label">Per-Sentence Analysis
+                        <span class="multi-badge">MIXED EMOTION</span>
+                    </div>
+                    <div id="sentence-analysis-rows"></div>
+                </div>
+
+                <div class="divider" id="sentence-divider" style="display:none"></div>
 
                 <!-- Prosody strip -->
                 <div class="prosody-strip">

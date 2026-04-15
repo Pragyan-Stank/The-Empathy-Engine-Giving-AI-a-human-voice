@@ -1,105 +1,85 @@
 """
-ElevenLabs TTS — Primary expressive synthesis engine.
+ElevenLabs TTS Engine — official elevenlabs Python SDK (v2.x).
 
-Unlike Edge TTS (which modulates rate/pitch/volume numerically), ElevenLabs
-maps emotion directly to voice character via:
-  - stability       (0=variable/expressive  ↔  1=stable/monotone)
-  - style           (0=neutral              ↔  1=highly styled)
-  - similarity_boost(0=allow deviation      ↔  1=strict to voice character)
+Uses:
+  - elevenlabs.client.ElevenLabs for authentication
+  - client.text_to_speech.convert() → Iterator[bytes]
+  - model_id="eleven_v3" (most expressive, supports style/stability/similarity)
+  - Emotion → VoiceSettings mapping for per-emotion expressiveness tuning
+  - asyncio executor to run the synchronous SDK call without blocking the event loop
 
-This produces genuinely emotion-aware speech without needing SSML prosody tags.
-API docs: https://api.elevenlabs.io/docs
+API key: read from settings.ELEVEN_LABS (env var: ELEVEN_LABS)
 """
-import httpx
+import os
+import asyncio
 from typing import Dict
+
+try:
+    from elevenlabs.client import ElevenLabs
+    from elevenlabs import VoiceSettings
+    _SDK_AVAILABLE = True
+except ImportError:
+    _SDK_AVAILABLE = False
 
 from app.services.tts.base import TTSEngine
 from app.core.exceptions import TTSGenerationError
 from app.core.logging_config import logger
 from app.core.config import settings
 
-ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech"
-MODEL_ID = "eleven_multilingual_v2"
+# ── Default voice (Rachel — neutral female, great expressiveness range) ────────
+_DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"   # Rachel
 
-# Charlie: highly expressive, natural male American voice
-# Free tier alternatives: Adam (pNInz6obpgDQGcFmaJgB), Bella (EXAVITQu4vr4xnSDxMaL)
-DEFAULT_VOICE_ID = "IKne3meq5aSn9XLyUdCD"  # Charlie
-
-# ── Emotion → Voice Settings Map ─────────────────────────────────────────────
-# Each entry defines the character of the voice for a given emotion.
-# style and stability are the most impactful levers.
-VOICE_SETTINGS_MAP: Dict[str, Dict] = {
-    # ── Positive ──────────────────────────────────────────────────────────
-    "joy": {
-        "stability": 0.35, "similarity_boost": 0.80,
-        "style": 0.65,     "use_speaker_boost": True,
-    },
-    "excitement": {
-        "stability": 0.15, "similarity_boost": 0.85,
-        "style": 0.95,     "use_speaker_boost": True,
-    },
-    "contentment": {
-        "stability": 0.70, "similarity_boost": 0.75,
-        "style": 0.25,     "use_speaker_boost": False,
-    },
-    # ── Negative ──────────────────────────────────────────────────────────
-    "sadness": {
-        "stability": 0.75, "similarity_boost": 0.60,
-        "style": 0.15,     "use_speaker_boost": False,
-    },
-    "grief": {
-        "stability": 0.85, "similarity_boost": 0.55,
-        "style": 0.05,     "use_speaker_boost": False,
-    },
-    "anger": {
-        "stability": 0.20, "similarity_boost": 0.90,
-        "style": 0.80,     "use_speaker_boost": True,
-    },
-    "rage": {
-        "stability": 0.05, "similarity_boost": 0.95,
-        "style": 1.00,     "use_speaker_boost": True,
-    },
-    "frustration": {
-        "stability": 0.35, "similarity_boost": 0.80,
-        "style": 0.60,     "use_speaker_boost": True,
-    },
-    "disgust": {
-        "stability": 0.40, "similarity_boost": 0.70,
-        "style": 0.55,     "use_speaker_boost": True,
-    },
-    # ── Fearful ────────────────────────────────────────────────────────────
-    "fear": {
-        "stability": 0.25, "similarity_boost": 0.75,
-        "style": 0.55,     "use_speaker_boost": True,
-    },
-    "anxiety": {
-        "stability": 0.20, "similarity_boost": 0.75,
-        "style": 0.65,     "use_speaker_boost": True,
-    },
-    # ── Other ──────────────────────────────────────────────────────────────
-    "surprise": {
-        "stability": 0.10, "similarity_boost": 0.85,
-        "style": 0.90,     "use_speaker_boost": True,
-    },
-    "neutral": {
-        "stability": 0.75, "similarity_boost": 0.75,
-        "style": 0.00,     "use_speaker_boost": False,
-    },
+# ── Emotion → VoiceSettings ────────────────────────────────────────────────────
+# stability:        0 = variable/expressive,  1 = stable/monotone
+# similarity_boost: how closely to stay to the original voice character
+# style:            0 = restrained,  1 = maximum stylistic expression
+_EMOTION_SETTINGS: Dict[str, dict] = {
+    "joy":         {"stability": 0.35, "similarity_boost": 0.75, "style": 0.65, "use_speaker_boost": True},
+    "excitement":  {"stability": 0.25, "similarity_boost": 0.70, "style": 0.85, "use_speaker_boost": True},
+    "contentment": {"stability": 0.55, "similarity_boost": 0.80, "style": 0.40, "use_speaker_boost": True},
+    "sadness":     {"stability": 0.60, "similarity_boost": 0.85, "style": 0.50, "use_speaker_boost": False},
+    "grief":       {"stability": 0.70, "similarity_boost": 0.90, "style": 0.55, "use_speaker_boost": False},
+    "anger":       {"stability": 0.30, "similarity_boost": 0.70, "style": 0.80, "use_speaker_boost": True},
+    "frustration": {"stability": 0.35, "similarity_boost": 0.75, "style": 0.70, "use_speaker_boost": True},
+    "rage":        {"stability": 0.20, "similarity_boost": 0.65, "style": 0.90, "use_speaker_boost": True},
+    "disgust":     {"stability": 0.40, "similarity_boost": 0.75, "style": 0.70, "use_speaker_boost": True},
+    "fear":        {"stability": 0.45, "similarity_boost": 0.80, "style": 0.70, "use_speaker_boost": True},
+    "anxiety":     {"stability": 0.50, "similarity_boost": 0.80, "style": 0.60, "use_speaker_boost": True},
+    "surprise":    {"stability": 0.30, "similarity_boost": 0.70, "style": 0.75, "use_speaker_boost": True},
+    "neutral":     {"stability": 0.65, "similarity_boost": 0.85, "style": 0.25, "use_speaker_boost": False},
 }
-
-_DEFAULT_SETTINGS = VOICE_SETTINGS_MAP["neutral"]
+_DEFAULT_SETTINGS = _EMOTION_SETTINGS["neutral"]
 
 
 class ElevenLabsTTS(TTSEngine):
-    """ElevenLabs TTS with emotion-mapped voice settings."""
+    """
+    ElevenLabs TTS using the official Python SDK.
+    Runs the synchronous SDK call in a thread executor so FastAPI's async
+    event loop is not blocked.  Auto-disables on 401/403 auth errors.
+    """
 
     def __init__(self):
-        self.api_key = settings.ELEVEN_LABS
-        self.available = bool(self.api_key)
-        if not self.available:
-            logger.warning("ELEVEN_LABS key not set. ElevenLabs TTS is disabled.")
-        else:
-            logger.info(f"ElevenLabs TTS ready — voice: {DEFAULT_VOICE_ID}, model: {MODEL_ID}")
+        if not _SDK_AVAILABLE:
+            self.available = False
+            logger.warning("ElevenLabs SDK not installed — run: pip install elevenlabs")
+            return
+
+        api_key = getattr(settings, "ELEVEN_LABS", None)
+        if not api_key:
+            self.available = False
+            logger.warning("ElevenLabs: ELEVEN_LABS env var not set.")
+            return
+
+        try:
+            self.client   = ElevenLabs(api_key=api_key)
+            self.voice_id = _DEFAULT_VOICE_ID
+            self.available = True
+            logger.info(
+                f"ElevenLabs TTS ready — SDK v2, model=eleven_v3, voice={self.voice_id}"
+            )
+        except Exception as e:
+            self.available = False
+            logger.error(f"ElevenLabs init error: {e}")
 
     async def synthesize(
         self,
@@ -110,58 +90,51 @@ class ElevenLabsTTS(TTSEngine):
         emotion: str = "neutral",
     ) -> str:
         if not self.available:
-            raise TTSGenerationError("ElevenLabs API key not configured.")
+            raise TTSGenerationError("ElevenLabs not available.")
 
-        voice_settings = VOICE_SETTINGS_MAP.get(emotion.lower(), _DEFAULT_SETTINGS).copy()
+        cfg = _EMOTION_SETTINGS.get(emotion.lower(), _DEFAULT_SETTINGS)
+        voice_settings = VoiceSettings(
+            stability=cfg["stability"],
+            similarity_boost=cfg["similarity_boost"],
+            style=cfg["style"],
+            use_speaker_boost=cfg["use_speaker_boost"],
+        )
+
+        if not filepath.endswith(".mp3"):
+            filepath = os.path.splitext(filepath)[0] + ".mp3"
 
         logger.info(
             f"ElevenLabs: emotion={emotion}, "
-            f"stability={voice_settings['stability']}, "
-            f"style={voice_settings['style']}"
+            f"stability={cfg['stability']}, style={cfg['style']}"
         )
 
-        payload = {
-            "text": text,
-            "model_id": MODEL_ID,
-            "voice_settings": voice_settings,
-        }
+        def _synthesize_sync() -> str:
+            """Runs in a thread executor — SDK is synchronous."""
+            audio_iter = self.client.text_to_speech.convert(
+                voice_id=self.voice_id,
+                text=text,
+                model_id="eleven_v3",
+                output_format="mp3_44100_128",
+                voice_settings=voice_settings,
+            )
+            with open(filepath, "wb") as f:
+                for chunk in audio_iter:
+                    if chunk:
+                        f.write(chunk)
+            return filepath
 
         try:
-            async with httpx.AsyncClient(timeout=25.0) as client:
-                response = await client.post(
-                    f"{ELEVENLABS_API_URL}/{DEFAULT_VOICE_ID}",
-                    headers={
-                        "xi-api-key": self.api_key,
-                        "Content-Type": "application/json",
-                        "Accept": "audio/mpeg",
-                    },
-                    json=payload,
-                )
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, _synthesize_sync)
+            logger.info(f"ElevenLabs audio saved: {result}")
+            return result
 
-                if response.status_code != 200:
-                    detail = response.text[:300]
-                    logger.error(f"ElevenLabs API error {response.status_code}: {detail}")
-                    # Permanent failures — disable provider for this session
-                    if response.status_code in (401, 403):
-                        self.available = False
-                        logger.warning(
-                            "ElevenLabs permanently disabled for this session "
-                            f"(HTTP {response.status_code}). Will use next provider."
-                        )
-                    raise TTSGenerationError(
-                        f"ElevenLabs returned {response.status_code}: {detail}"
-                    )
-
-                with open(filepath, "wb") as f:
-                    f.write(response.content)
-
-                logger.info(
-                    f"ElevenLabs audio saved: {filepath} ({len(response.content):,} bytes)"
-                )
-                return filepath
-
-        except TTSGenerationError:
-            raise
         except Exception as e:
-            logger.error(f"ElevenLabs request failed: {e}", exc_info=True)
-            raise TTSGenerationError(f"ElevenLabs error: {e}")
+            err = str(e)
+            # Permanent auth / abuse errors — disable for the session
+            if any(x in err.lower() for x in ("401", "403", "unusual", "disabled", "unauthorized")):
+                self.available = False
+                logger.warning(
+                    f"ElevenLabs permanently disabled for this session: {err[:250]}"
+                )
+            raise TTSGenerationError(f"ElevenLabs SDK error: {err[:300]}")

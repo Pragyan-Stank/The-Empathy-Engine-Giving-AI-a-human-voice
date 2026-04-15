@@ -1,33 +1,41 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
-    const form         = document.getElementById('synth-form');
-    const textInput    = document.getElementById('text-input');
-    const charCount    = document.getElementById('char-count');
-    const emotionSel   = document.getElementById('emotion-override');
+    const form            = document.getElementById('synth-form');
+    const textInput       = document.getElementById('text-input');
+    const charCount       = document.getElementById('char-count');
+    const emotionSel      = document.getElementById('emotion-override');
     const intensitySlider = document.getElementById('intensity-slider');
-    const intensityVal = document.getElementById('intensity-val');
-    const rateSlider   = document.getElementById('rate-slider');
-    const pitchSlider  = document.getElementById('pitch-slider');
-    const volumeSlider = document.getElementById('volume-slider');
-    const rateVal      = document.getElementById('rate-val');
-    const pitchVal     = document.getElementById('pitch-val');
-    const volumeVal    = document.getElementById('volume-val');
-    const resetBtn     = document.getElementById('reset-controls');
-    const generateBtn  = document.getElementById('generate-btn');
-    const errorBox     = document.getElementById('error-box');
-    const resultPanel  = document.getElementById('result-panel');
+    const intensityVal    = document.getElementById('intensity-val');
+    const rateSlider      = document.getElementById('rate-slider');
+    const pitchSlider     = document.getElementById('pitch-slider');
+    const volumeSlider    = document.getElementById('volume-slider');
+    const rateVal         = document.getElementById('rate-val');
+    const pitchVal        = document.getElementById('pitch-val');
+    const volumeVal       = document.getElementById('volume-val');
+    const resetBtn        = document.getElementById('reset-controls');
+    const generateBtn     = document.getElementById('generate-btn');
+    const errorBox        = document.getElementById('error-box');
+    const resultPanel     = document.getElementById('result-panel');
 
     // Result elements
-    const resEmotion   = document.getElementById('res-emotion');
-    const resBadge     = document.getElementById('sentiment-badge');
-    const resConf      = document.getElementById('res-confidence');
-    const resIntensity = document.getElementById('res-intensity');
-    const chipRate     = document.getElementById('chip-rate');
-    const chipPitch    = document.getElementById('chip-pitch');
-    const chipVolume   = document.getElementById('chip-volume');
-    const audioEl      = document.getElementById('audio-output');
-    const resSSML      = document.getElementById('res-ssml');
+    const resEmotion    = document.getElementById('res-emotion');
+    const resBadge      = document.getElementById('sentiment-badge');
+    const resConf       = document.getElementById('res-confidence');
+    const resIntensity  = document.getElementById('res-intensity');
+    const chipRate      = document.getElementById('chip-rate');
+    const chipPitch     = document.getElementById('chip-pitch');
+    const chipVolume    = document.getElementById('chip-volume');
+    const audioEl       = document.getElementById('audio-output');
+    const resSSML       = document.getElementById('res-ssml');
+
+    // Breakdown elements
+    const breakdownSection  = document.getElementById('emotion-breakdown-section');
+    const breakdownBars     = document.getElementById('emotion-breakdown-bars');
+    const sentenceSection   = document.getElementById('sentence-analysis-section');
+    const sentenceRows      = document.getElementById('sentence-analysis-rows');
+    const sentenceDivider   = document.getElementById('sentence-divider');
+    const breakdownDivider  = document.getElementById('breakdown-divider');
 
     // ── Character counter ────────────────────────────────────────────
     textInput.addEventListener('input', () => {
@@ -71,9 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     resetBtn.addEventListener('click', resetSliders);
 
-    // ── Set sliders to detected prosody (after response) ──────────────
+    // ── Update sliders to detected prosody ───────────────────────────
     function applyProsodyToSliders(prosody) {
-        // Only update sliders that haven't been manually moved
         if (rateSlider.dataset.auto === 'true') {
             const rv = parsePct(prosody.rate);
             rateSlider.value = rv;
@@ -117,6 +124,46 @@ document.addEventListener('DOMContentLoaded', () => {
         return payload;
     }
 
+    // ── Render emotion breakdown bars ────────────────────────────────
+    function renderBreakdown(breakdown) {
+        breakdownBars.innerHTML = '';
+        const entries = Object.entries(breakdown);
+        if (!entries.length) return;
+
+        entries.forEach(([emotion, pct]) => {
+            const row = document.createElement('div');
+            row.className = 'breakdown-row';
+            row.innerHTML = `
+                <span class="breakdown-emotion">${capitalize(emotion)}</span>
+                <div class="breakdown-bar-wrap">
+                    <div class="breakdown-bar-fill" data-emotion="${emotion}" style="width:${pct}%"></div>
+                </div>
+                <span class="breakdown-pct">${pct}%</span>
+            `;
+            breakdownBars.appendChild(row);
+        });
+    }
+
+    // ── Render per-sentence analysis ─────────────────────────────────
+    function renderSentenceAnalysis(sentences) {
+        sentenceRows.innerHTML = '';
+        sentences.forEach((s, i) => {
+            const row = document.createElement('div');
+            row.className = 'sentence-row';
+            row.innerHTML = `
+                <span class="sentence-index">${String(i + 1).padStart(2, '0')}</span>
+                <span class="sentence-text">${escapeHtml(s.text)}</span>
+                <span class="sentence-tag" data-emotion="${s.emotion}">${capitalize(s.emotion)}</span>
+            `;
+            sentenceRows.appendChild(row);
+        });
+    }
+
+    function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+    function escapeHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
     // ── Form submit ──────────────────────────────────────────────────
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -140,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error || data.detail || 'Synthesis failed.');
             }
 
-            // Populate results
+            // ── Core metrics ──────────────────────────────────────
             resEmotion.textContent   = data.detected_emotion;
             resBadge.textContent     = data.sentiment;
             resConf.textContent      = Math.round(data.confidence * 100) + '%';
@@ -152,17 +199,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
             resSSML.textContent = data.ssml_preview || '';
 
-            // Audio
+            // ── Emotion breakdown bars ─────────────────────────────
+            const breakdown = data.emotion_breakdown || {};
+            renderBreakdown(breakdown);
+            breakdownSection.style.display = Object.keys(breakdown).length ? '' : 'none';
+            breakdownDivider.style.display  = Object.keys(breakdown).length ? '' : 'none';
+
+            // ── Per-sentence analysis ──────────────────────────────
+            const sentences = data.sentence_analysis || [];
+            if (data.is_multi_emotion && sentences.length > 1) {
+                renderSentenceAnalysis(sentences);
+                sentenceSection.classList.remove('hidden');
+                sentenceDivider.style.display = '';
+            } else {
+                sentenceSection.classList.add('hidden');
+                sentenceDivider.style.display = 'none';
+            }
+
+            // ── Audio ──────────────────────────────────────────────
             audioEl.src = data.audio_url + '?t=' + Date.now();
             audioEl.load();
 
             resultPanel.classList.remove('hidden');
             resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-            // Update sliders to reflect what was actually used
             applyProsodyToSliders(data.prosody);
-
-            // Auto-play (may be blocked by browser policy)
             audioEl.play().catch(() => {});
 
         } catch (err) {
