@@ -1,0 +1,14 @@
+fastapi>=0.103.0
+uvicorn>=0.23.2
+pydantic>=2.3.0
+pydantic-settings>=2.0.3
+transformers
+torch
+vaderSentiment
+google-cloud-texttospeech
+pyttsx3
+jinja2
+python-multipart
+python-dotenv
+pytest
+httpx

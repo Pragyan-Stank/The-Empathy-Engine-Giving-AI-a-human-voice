@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empathy Engine</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="layout">
+        <header>
+            <h1>Empathy Engine</h1>
+            <p class="subtitle">Emotion-aware synthesized speech. Enter text, let the system classify the emotion, and hear the expressive result.</p>
+        </header>
+        
+        <main>
+            <section class="input-panel">
+                <form id="synth-form">
+                    <div class="form-group">
+                        <label for="text-input">Input Text</label>
+                        <textarea id="text-input" rows="5" placeholder="Type something expressive here..." required></textarea>
+                    </div>
+
+                    <div class="controls-grid">
+                        <div class="form-group">
+                            <label for="emotion-override">Emotion Override (Optional)</label>
+                            <select id="emotion-override">
+                                <option value="">Auto-Detect</option>
+                                <option value="joy">Joy</option>
+                                <option value="sadness">Sadness</option>
+                                <option value="anger">Anger</option>
+                                <option value="fear">Fear</option>
+                                <option value="surprise">Surprise</option>
+                                <option value="neutral">Neutral</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="intensity-slider">Emotion Intensity (<span id="intensity-val">1.0</span>)</label>
+                            <input type="range" id="intensity-slider" min="0" max="1" step="0.1" value="1.0">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="generate-btn" class="btn">Generate Speech</button>
+                    <div id="error-box" class="error-box hidden"></div>
+                </form>
+            </section>
+
+            <section class="result-panel hidden" id="result-panel">
+                <div class="card result-card">
+                    <div class="card-header">
+                        <h2>Analysis Result</h2>
+                        <span id="sentiment-badge" class="badge"></span>
+                    </div>
+                    
+                    <div class="metrics-grid">
+                        <div class="metric">
+                            <span class="metric-label">Detected Emotion</span>
+                            <span class="metric-value capitalize" id="res-emotion">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Confidence</span>
+                            <span class="metric-value" id="res-confidence">-</span>
+                        </div>
+                    </div>
+
+                    <div class="prosody-section">
+                        <h3>Prosody Mapping</h3>
+                        <div class="prosody-row">
+                            <span class="pros-capsule">Rate: <span id="res-rate"></span></span>
+                            <span class="pros-capsule">Pitch: <span id="res-pitch"></span></span>
+                            <span class="pros-capsule">Volume: <span id="res-volume"></span></span>
+                        </div>
+                    </div>
+
+                    <div class="ssml-preview">
+                        <h3>SSML Preview</h3>
+                        <pre id="res-ssml"></pre>
+                    </div>
+
+                    <div class="audio-player">
+                        <audio id="audio-output" controls>
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
