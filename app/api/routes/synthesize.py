@@ -53,6 +53,7 @@ from app.services.audio.storage import AudioStorageService
 from app.services.audio.post_processor import process_audio
 from app.services.llm.speech_analyzer import analyze_speech, SpeechAnalysis
 from app.services.tts.prosody_curve import build_segment_prosodies, edge_tts_format
+from app.services.text.language_detector import detect_language, is_hindi_or_hinglish
 
 router = APIRouter()
 
@@ -154,6 +155,17 @@ async def synthesize_speech(request: SynthesizeRequest):
         raise HTTPException(status_code=400, detail="Text cannot be empty.")
 
     try:
+        # Step 0 — Detect input language (drives voice selection + LLM behaviour)
+        input_lang, lang_confidence = detect_language(clean_text)
+        is_hindi = input_lang in ("hi", "hi-Latn")
+        lang_label = {
+            "hi": "Hindi (Devanagari)",
+            "hi-Latn": "Hinglish (Romanized Hindi)",
+            "en": "English",
+        }.get(input_lang, "English")
+        logger.info(
+            f"Language detection: {lang_label} (tag={input_lang}, conf={lang_confidence:.2f})"
+        )
         # Step 1 — Sentiment polarity (VADER, always)
         sentiment_label, _ = _vader.analyze_sentiment(clean_text)
 
@@ -234,17 +246,27 @@ async def synthesize_speech(request: SynthesizeRequest):
         # LLM humanized_text is capped at 1200 chars by the token budget —
         # using it for long texts silently drops everything after ~1200 chars.
         # LLM value for long texts = segment_deltas + emphasis_words, NOT text rewriting.
+        #
+        # LANGUAGE SAFETY: For Hindi/Hinglish input, ALWAYS prefer the original
+        # clean_text. The LLM might still translate despite strong prompt constraints.
+        # We only trust the LLM's humanized output for English text.
         SHORT_TEXT_LIMIT = 800  # increased from 600 — LLM now has more token budget
         if (
             speech_analysis.llm_used
             and speech_analysis.humanized_text
             and len(clean_text) <= SHORT_TEXT_LIMIT
+            and not is_hindi  # NEVER use LLM-rewritten text for Hindi/Hinglish
         ):
             base_for_tts = speech_analysis.humanized_text
             logger.info(f"Using LLM-humanized text ({len(base_for_tts)} chars)")
         else:
             base_for_tts = clean_text
-            if speech_analysis.llm_used and len(clean_text) > SHORT_TEXT_LIMIT:
+            if is_hindi:
+                logger.info(
+                    f"Hindi/Hinglish input — using original text to prevent translation; "
+                    "LLM prosody deltas + emphasis still applied"
+                )
+            elif speech_analysis.llm_used and len(clean_text) > SHORT_TEXT_LIMIT:
                 logger.info(
                     f"Long text ({len(clean_text)} chars) — using full clean_text; "
                     "LLM prosody deltas + emphasis still applied"

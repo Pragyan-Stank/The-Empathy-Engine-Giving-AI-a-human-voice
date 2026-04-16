@@ -39,6 +39,7 @@ from app.services.tts.expressive_edge_tts import ExpressiveEdgeTTS
 from app.services.audio.post_processor import process_audio
 from app.services.llm.speech_analyzer import analyze_speech
 from app.services.tts.prosody_curve import google_tts_format_from_deltas
+from app.services.text.language_detector import detect_language, is_hindi_or_hinglish
 
 router = APIRouter()
 
@@ -126,10 +127,15 @@ async def stream_speech(websocket: WebSocket):
                 })
 
                 # ── Step 3: Text Enhancement ──────────────────────────────
+                # Language-safety: never use LLM-rewritten text for Hindi/Hinglish
+                input_lang, _ = detect_language(text)
+                is_hindi = input_lang in ("hi", "hi-Latn")
+
                 SHORT_TEXT_LIMIT = 600
                 if (speech_analysis.llm_used
                     and speech_analysis.humanized_text
-                    and len(text) <= SHORT_TEXT_LIMIT):
+                    and len(text) <= SHORT_TEXT_LIMIT
+                    and not is_hindi):
                     base_for_tts = speech_analysis.humanized_text
                 else:
                     base_for_tts = text

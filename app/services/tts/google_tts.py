@@ -52,6 +52,7 @@ from app.core.config import settings
 from app.services.emotion.sentence_analysis import split_sentences, detect_sentence_emotion
 from app.services.tts.ssml_builder import SSMLBuilder
 from app.services.tts.prosody_curve import google_tts_format_from_deltas
+from app.services.text.language_detector import detect_language
 
 TTS_REST_URL = "https://texttospeech.googleapis.com/v1/text:synthesize"
 
@@ -77,7 +78,7 @@ _VOICE_MAP: Dict[str, Tuple[str, str]] = {
 }
 _DEFAULT_VOICE = ("en-US-Neural2-J", "MALE")
 
-# Indian English voices for Hinglish / Indian cadence detection
+# Indian English voices for Indian-accented English
 _INDIAN_VOICE_MAP: Dict[str, Tuple[str, str]] = {
     "joy":         ("en-IN-Neural2-A", "FEMALE"),
     "excitement":  ("en-IN-Neural2-A", "FEMALE"),
@@ -95,14 +96,23 @@ _INDIAN_VOICE_MAP: Dict[str, Tuple[str, str]] = {
 }
 _DEFAULT_INDIAN_VOICE = ("en-IN-Neural2-B", "MALE")
 
-# Hinglish / Indian language markers for voice selection
-_HINGLISH_MARKERS = re.compile(
-    r"\b(yaar|bhai|acha|haan|nahi|matlab|toh|bas|chal|arre|oye|suno|dekho|"
-    r"samjhe|theek|bilkul|ekdum|kya|hai|ho|gaya|karo|accha|ji|arrey|"
-    r"chalo|abhi|bohot|bahut|lekin|kyunki|isliye|woh|yeh|mera|tera|"
-    r"kuch|koi|kaisa|kaise|kitna|kidhar|idhar|udhar|wahan|yahan)\b",
-    re.IGNORECASE,
-)
+# Hindi voices for pure Hindi / Hinglish (hi-IN) content
+_HINDI_VOICE_MAP: Dict[str, Tuple[str, str]] = {
+    "joy":         ("hi-IN-Neural2-A", "FEMALE"),
+    "excitement":  ("hi-IN-Neural2-A", "FEMALE"),
+    "contentment": ("hi-IN-Neural2-A", "FEMALE"),
+    "sadness":     ("hi-IN-Neural2-A", "FEMALE"),
+    "grief":       ("hi-IN-Neural2-A", "FEMALE"),
+    "anger":       ("hi-IN-Neural2-B", "MALE"),
+    "frustration": ("hi-IN-Neural2-B", "MALE"),
+    "rage":        ("hi-IN-Neural2-B", "MALE"),
+    "fear":        ("hi-IN-Neural2-A", "FEMALE"),
+    "anxiety":     ("hi-IN-Neural2-A", "FEMALE"),
+    "surprise":    ("hi-IN-Neural2-A", "FEMALE"),
+    "disgust":     ("hi-IN-Neural2-B", "MALE"),
+    "neutral":     ("hi-IN-Neural2-B", "MALE"),
+}
+_DEFAULT_HINDI_VOICE = ("hi-IN-Neural2-B", "MALE")
 
 # ── Emotion → device profile ──────────────────────────────────────────────────
 _EMOTION_PROFILE: Dict[str, str] = {
@@ -171,11 +181,27 @@ def _parse_volume(vol_str: str) -> float:
         return 0.0
 
 
-def _detect_hinglish(text: str) -> bool:
-    """Return True if text contains Hinglish / Indian language markers."""
-    matches = _HINGLISH_MARKERS.findall(text)
-    # Need at least 2 markers to switch to Indian voice
-    return len(matches) >= 2
+def _detect_text_language(text: str) -> Tuple[str, str, Dict, Tuple]:
+    """
+    Detect language and return (lang_code, lang_tag, voice_map, default_voice).
+
+    Returns:
+        lang_code: "hi-IN" | "en-IN" | "en-US"
+        lang_tag: "hi" | "hi-Latn" | "en"
+        voice_map: appropriate voice map dict
+        default_voice: appropriate default voice tuple
+    """
+    lang, confidence = detect_language(text)
+    if lang == "hi":
+        return "hi-IN", lang, _HINDI_VOICE_MAP, _DEFAULT_HINDI_VOICE
+    elif lang == "hi-Latn":
+        # Hinglish: use Hindi voices if confidence is high (strong Hindi presence)
+        # otherwise fall back to Indian English voices (better with English words)
+        if confidence >= 0.6:
+            return "hi-IN", lang, _HINDI_VOICE_MAP, _DEFAULT_HINDI_VOICE
+        else:
+            return "en-IN", lang, _INDIAN_VOICE_MAP, _DEFAULT_INDIAN_VOICE
+    return "en-US", lang, _VOICE_MAP, _DEFAULT_VOICE
 
 
 def _strip_outer_prosody(ssml: str) -> str:
@@ -216,14 +242,14 @@ class GoogleCloudTTS(TTSEngine):
         if not filepath.endswith(".mp3"):
             filepath = filepath.rsplit(".", 1)[0] + ".mp3"
 
-        # Detect if we should use Indian English voices
-        use_indian = _detect_hinglish(text)
-        voice_map = _INDIAN_VOICE_MAP if use_indian else _VOICE_MAP
-        default_voice = _DEFAULT_INDIAN_VOICE if use_indian else _DEFAULT_VOICE
-        lang_code = "en-IN" if use_indian else "en-US"
+        # Detect language and select voice map accordingly
+        lang_code, lang_tag, voice_map, default_voice = _detect_text_language(text)
 
-        if use_indian:
-            logger.info("Hinglish detected — using Indian English Neural2 voices")
+        if lang_tag in ("hi", "hi-Latn"):
+            logger.info(
+                f"{'Hindi' if lang_tag == 'hi' else 'Hinglish'} detected — "
+                f"using {lang_code} voices"
+            )
 
         # Parse base prosody
         base_rate   = _parse_rate(prosody.get("rate", "default"))
@@ -354,10 +380,13 @@ class GoogleCloudTTS(TTSEngine):
             )
 
         # FALLBACK: Sequential per-segment synthesis
+        # IMPORTANT: Use ONE consistent voice for the entire response.
+        # Only prosody varies per segment — voice identity must stay the same
+        # to prevent jarring male→female switches mid-sentence.
+        locked_voice, locked_gender = voice_map.get(emotion.lower(), default_voice)
         all_audio = bytearray()
         for i, (sent, seg_info) in enumerate(zip(sentences, ssml_segments)):
             s_emotion = seg_info.get("emotion", emotion)
-            voice_name, gender = voice_map.get(s_emotion.lower(), default_voice)
 
             # Build individual segment SSML
             emphasis = seg_info.get("emphasis_words", [])
@@ -369,11 +398,11 @@ class GoogleCloudTTS(TTSEngine):
 
             logger.info(
                 f"  Seg {i+1}/{len(sentences)}: emotion={s_emotion} "
-                f"voice={voice_name} rate={rate_m}x pitch={pitch_st}st vol={vol_db}dB"
+                f"voice={locked_voice} rate={rate_m}x pitch={pitch_st}st vol={vol_db}dB"
             )
             try:
                 chunk = await self._call_api(
-                    seg_ssml, voice_name, gender,
+                    seg_ssml, locked_voice, locked_gender,
                     rate_m, pitch_st, vol_db,
                     lang_code, device_profile,
                 )
@@ -405,28 +434,29 @@ class GoogleCloudTTS(TTSEngine):
         base_vol: float,
     ) -> str:
         """
-        Sequential per-sentence synthesis with emotion-aware voice selection.
-        Each sentence gets its own emotion detection → voice selection.
+        Sequential per-sentence synthesis with consistent voice identity.
+        Uses ONE voice locked to the overall emotion — only prosody varies.
         """
+        # Lock voice to overall emotion — prevents male/female switching
+        locked_voice, locked_gender = voice_map.get(emotion.lower(), default_voice)
         logger.info(
             f"Google TTS sequential: {len(sentences)} segments, "
-            f"per-sentence emotion voices active"
+            f"locked voice={locked_voice} (emotion={emotion})"
         )
         all_audio = bytearray()
         for i, sentence in enumerate(sentences):
             s_emotion, _ = detect_sentence_emotion(sentence)
-            voice_name, gender = voice_map.get(s_emotion.lower(), default_voice)
 
             # Build SSML with emphasis for this segment
             seg_ssml = _ssml.build_ssml_engine(sentence, emotion=s_emotion)
 
             logger.info(
                 f"  Seg {i+1}/{len(sentences)}: emotion={s_emotion} "
-                f"voice={voice_name}"
+                f"voice={locked_voice}"
             )
             try:
                 chunk = await self._call_api(
-                    seg_ssml, voice_name, gender,
+                    seg_ssml, locked_voice, locked_gender,
                     base_rate, base_pitch, base_vol,
                     lang_code, device_profile,
                 )

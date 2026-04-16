@@ -41,6 +41,7 @@ from typing import Dict, List, Optional, Tuple
 import httpx
 
 from app.core.config import settings
+from app.services.text.language_detector import detect_language, is_hindi_or_hinglish
 
 
 logger = logging.getLogger("empathy_engine")
@@ -82,7 +83,7 @@ class SpeechAnalysis:
 
 # ── System prompt ──────────────────────────────────────────────────────────────
 
-_SYSTEM = (
+_SYSTEM_BASE = (
     "You are a TTS speech performance director. "
     "Your job is to transform written text into a HUMAN SPEECH PERFORMANCE. "
     "Think like a voice actor preparing delivery — model pauses, "
@@ -90,21 +91,49 @@ _SYSTEM = (
     "Output ONLY valid JSON. No explanation. No markdown."
 )
 
+# Extra-strict constraint injected when Hindi/Hinglish is detected
+_SYSTEM_HINDI_CONSTRAINT = (
+    "\n\n### ABSOLUTE LANGUAGE RULE ###\n"
+    "The input text is in Hindi / Hinglish. You MUST follow these rules:\n"
+    "1. NEVER translate ANY word to English. Not a single word.\n"
+    "2. Output humanized_text and ALL segment texts in THE EXACT SAME LANGUAGE as the input.\n"
+    "3. If input is in Devanagari (हिंदी), output MUST stay in Devanagari.\n"
+    "4. If input is in Roman Hindi (Hinglish), output MUST stay in Roman Hindi.\n"
+    "5. You may ONLY change punctuation, add pauses, restructure phrasing — "
+    "but EVERY word must remain in the input language.\n"
+    "6. Fillers should be Hindi: 'acha', 'toh', 'dekho', 'matlab', 'suno' — NOT English fillers.\n"
+    "Violating these rules is an ABSOLUTE FAILURE."
+)
+
+_SYSTEM_ENGLISH = (
+    "\nCRITICAL: NEVER translate text to another language. "
+    "If the input is in Hindi, Hinglish, or any Indian language, keep it in that EXACT language. "
+    "Only improve spoken delivery, do NOT change the language."
+)
+
+
+def _build_system_prompt(lang: str) -> str:
+    """Build the system prompt with language-specific constraints."""
+    if lang in ("hi", "hi-Latn"):
+        return _SYSTEM_BASE + _SYSTEM_HINDI_CONSTRAINT
+    return _SYSTEM_BASE + _SYSTEM_ENGLISH
+
 _USER_TMPL = """Analyze for speech PERFORMANCE (not just reading):
 TEXT: {text}
 EMOTION: {emotion}
 INTENSITY: {intensity}
+DETECTED_LANGUAGE: {language}
 
 Return this exact JSON (no other text):
 {{
-  "humanized_text": "rewrite as natural spoken words — how a HUMAN would ACTUALLY say this",
+  "humanized_text": "rewrite as natural spoken words — how a HUMAN would ACTUALLY say this IN THE SAME LANGUAGE",
   "delivery_style": "casual|empathetic|authoritative|excited|somber|conversational|reflective",
   "intent": "informational|empathetic|persuasive|urgent|reflective",
   "tone_arc": "steady|slow_build|peak_then_fade|emotional_wave|building_urgency",
   "filler": "",
   "segments": [
     {{
-      "text": "segment text (one phrase/clause)",
+      "text": "segment text IN THE SAME LANGUAGE as input (one phrase/clause)",
       "emotion": "emotion label for this segment",
       "emphasis_words": ["key", "words"],
       "arc_position": "opening|middle|climax|closing",
@@ -117,19 +146,25 @@ Return this exact JSON (no other text):
 }}
 
 MANDATORY RULES:
-- humanized_text: how a HUMAN would SAY it (add ... ! ? naturally, preserve Hinglish)
-- Rewrite formal text into conversational phrasing
-- filler: one of "you know","actually","look","I mean","acha","toh" OR "" if not fit
+- humanized_text: how a HUMAN would SAY it (add ... ! ? naturally)
+- *** LANGUAGE PRESERVATION IS THE #1 RULE ***
+- If DETECTED_LANGUAGE is "hi" or "hi-Latn": output MUST be in Hindi/Hinglish. ZERO English translation.
+- If input is Devanagari Hindi, output MUST be Devanagari Hindi.
+- If input is Romanized Hindi (Hinglish), output MUST be Romanized Hindi.
+- Only improve spoken delivery style (pauses, emphasis, phrasing) — do NOT convert to English
+- Rewrite formal text into conversational phrasing IN THE SAME LANGUAGE as input
+- filler: if Hindi/Hinglish → use "acha","toh","dekho","matlab","suno","haan" ONLY
+         if English → use "you know","actually","look","I mean" OR ""
 - segments: one per breath group / clause, max 8
 - DELIVERY ARC: opening segments slower, climax fastest, closing slowing down
 - rate_delta_pct: VARY between -20 to +20 (NEVER all zeros — that's robotic)
 - pitch_delta_hz: VARY between -10 to +10 (rising on questions, falling on statements)
 - volume_delta_db: VARY between -4.0 to +4.0 (louder at emphasis, softer at reflection)
 - pause_before_ms: 0 to 900 (longer before emotional moments, shorter in fast sections)
-- emphasis_words: 1-3 KEY words per segment that need stress
+- emphasis_words: 1-3 KEY words per segment that need stress (in the INPUT LANGUAGE)
 - Every segment MUST have DIFFERENT prosody values — NO flat delivery allowed
 - If text has questions: raise pitch. If exclamations: louder + faster.
-- Preserve Indian English / Hinglish exactly as-is"""
+- Preserve Indian English / Hinglish / Hindi EXACTLY as-is — never translate"""
 
 
 # ── Emotion → default arc profiles ─────────────────────────────────────────────
@@ -170,11 +205,24 @@ async def analyze_speech(
     if not settings.GROQ_API_KEY:
         return _fallback(text, emotion, "No GROQ_API_KEY in .env")
 
+    # Detect input language to drive prompt behaviour
+    lang, lang_conf = detect_language(text)
+    lang_label = {
+        "hi": "Hindi (Devanagari)",
+        "hi-Latn": "Hinglish (Romanized Hindi)",
+        "en": "English",
+    }.get(lang, "English")
+
+    logger.info(f"SpeechAnalyzer: detected language={lang} ({lang_label}), conf={lang_conf:.2f}")
+
     prompt = _USER_TMPL.format(
         text=text[:1200],   # more room for context
         emotion=emotion,
         intensity=round(intensity, 2),
+        language=lang_label,
     )
+
+    system_prompt = _build_system_prompt(lang)
 
     try:
         async with httpx.AsyncClient(timeout=GROQ_TIMEOUT) as client:
@@ -187,7 +235,7 @@ async def analyze_speech(
                 json={
                     "model":       GROQ_MODEL,
                     "messages":    [
-                        {"role": "system", "content": _SYSTEM},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user",   "content": prompt},
                     ],
                     "temperature":      0.5,   # slightly more creative for variation
