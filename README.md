@@ -70,6 +70,36 @@ To simulate human-like conversational latency:
 
 ---
 
+## 🔄 Detailed Pipeline Workflow & Edge Case Handling
+
+The generation pipeline follows a stringent, stateful sequence. Below is the step-by-step logic, including how the system acts defensively against edge cases:
+
+### Step 1: Input Reception & Language Triage
+* **Logic**: Receives a raw string payload. Immediately invokes `detect_language`. Checks for Devanagari Unicode distributions and references a custom lexicon of 200+ Romanized Hindi/Hinglish terms (e.g., *yaar*, *matlab*, *achha*).
+* **Edge Case Handling (Ambiguity)**: If the text is short or mathematically ambiguous, the system assigns a low-confidence Hinglish score. It defaults the NLP to English but safely routes the TTS output to an Indian-accented English voice (`en-IN`) rather than a pure Hindi voice (`hi-IN`), preventing heavy mispronunciation of English loan words.
+
+### Step 2: Neural Emotion & Intensity Extraction
+* **Logic**: The text passes through a HuggingFace Transformer (`j-hartmann/distilroberta-base`) mapping the context to 7 core emotions. High-probability confidence directly scales the `intensity` multiplier (e.g., 90% sadness yields a heavy slow-down in speaking rate).
+* **Edge Case Handling (Model Timeout / Inference Failure)**: If the transformer API is unreachable, times out, or fails to initialize, the system seamlessly intercepts the error and routes the text to a deterministic `VaderSentimentFallback`. VADER processes the text via rule-based lexical heuristics to derive a fallback emotion, ensuring the API guarantees 100% uptime without 500 errors.
+
+### Step 3: LLM Speech Prompting (The "Voice Actor" Strategy)
+* **Logic**: The sanitized text and detected language state are forwarded to a Groq LLM (Llama / Mixtral) with JSON-mode enforced. The LLM acts as the "Speech Director," generating an array of `segments` (breath groups). For each segment, it calculates specific variance: `rate_delta_pct`, `pitch_delta_hz`, `pause_before_ms`, and an array of `emphasis_words`.
+* **Edge Case Handling (Translation Hallucination)**: LLMs naturally want to translate code-mixed text to English. If `lang="hi-Latn"`, the system injects a fierce system constraint prohibiting translation. As an absolute fail-safe, the orchestrator explicitly discards the LLM's "humanized_text" rewrite to prevent English artifacts but *retains* the JSON prosodic metadata.
+* **Edge Case Handling (LLM API Throttle)**: If Groq hits a rate limit, the system catches the exception, avoids crashing, and bypasses the LLM phase entirely—dropping back to deterministic, statically-mapped emotional rules.
+
+### Step 4: SSML Engine & Contextual Variables
+* **Logic**: The prosodic metadata and original text enter the `SSMLBuilder`. Targeted words are wrapped in `<emphasis>` tags. Segments are assigned their specific `<prosody>` configurations.
+* **Edge Case Handling (Asynchronous Context Leakage)**: Because TTS generation happens concurrently inside `asyncio.gather()`, state collision is a high risk (e.g., an angry sentence adopting the "sad" voice of a parallel thread). To prevent this, the monkey-patched Edge TTS module uses Python's strict `contextvars` to securely isolate `mstts:express-as` tags per-task.
+* **Edge Case Handling (Incompatible Voices)**: Native Hindi voice neural nodes (like `hi-IN-SwaraNeural`) occasionally reject `<mstts:express-as>` emotion tags, triggering a silent collapse in Azure. The pipeline acknowledges this constraint actively and strips style tags exclusively for the `hi-IN` routing, retaining only native prosody adjustments.
+
+### Step 5: Backend Audio DSP & Splicing
+* **Logic**: Raw MP3 byte-chunks arrive from the cloud engines. To smooth out harsh structural discrepancies between segment generations, `pydub` evaluates the intensity markers and applies localized volume curves/silence padding before dynamically splicing the segmented files into a singular waveform.
+
+### Step 6: Progressive Streaming to Client
+* **Logic**: Utilizing the WebSocket stream route, generated chunk `n+1` does not wait for chunk `n+n` to finish. The binary array is base64 encapsulated, shot to the user, and the native browser `<audio>` element plays it chronologically while the JS paints a rolling spectrogram derived from the browser's `AudioContext`.
+
+---
+
 ## 🚀 How to Run Locally
 
 1. **Clone the Repository**
