@@ -96,7 +96,10 @@ The generation pipeline follows a stringent, stateful sequence. Below is the ste
 * **Logic**: Raw MP3 byte-chunks arrive from the cloud engines. To smooth out harsh structural discrepancies between segment generations, `pydub` evaluates the intensity markers and applies localized volume curves/silence padding before dynamically splicing the segmented files into a singular waveform.
 
 ### Step 6: Progressive Streaming to Client
-* **Logic**: Utilizing the WebSocket stream route, generated chunk `n+1` does not wait for chunk `n+n` to finish. The binary array is base64 encapsulated, shot to the user, and the native browser `<audio>` element plays it chronologically while the JS paints a rolling spectrogram derived from the browser's `AudioContext`.
+* **Logic**: Utilizing the WebSocket stream route, generated chunk `n+1` does not wait for chunk `n+n` to finish. The binary array is base64 encapsulated, shot to the user, and the native browser `<audio>` element plays it chronologically.
+
+<img width="1024" height="1536" alt="workflow" src="https://github.com/user-attachments/assets/90e1f527-a711-4228-93ff-28c7268cfea0" />
+
 
 ---
 
