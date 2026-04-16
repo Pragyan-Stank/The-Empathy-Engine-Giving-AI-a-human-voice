@@ -234,4 +234,87 @@ document.addEventListener('DOMContentLoaded', () => {
             generateBtn.textContent = 'Generate Speech';
         }
     });
+
+    // ── Spectrogram Visualizer ───────────────────────────────────────
+    let audioContext, analyser, source, animFrameId;
+    const spectCanvas = document.getElementById('spectrogram-canvas');
+    const spectCtx = spectCanvas ? spectCanvas.getContext('2d') : null;
+
+    function initAudio() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 1024;
+            analyser.smoothingTimeConstant = 0.8;
+            
+            source = audioContext.createMediaElementSource(audioEl);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+        }
+    }
+
+    function startSpectrogram() {
+        if (!spectCanvas) return;
+        initAudio();
+        
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+        
+        if (audioEl.currentTime === 0 || !animFrameId) {
+            spectCtx.clearRect(0, 0, spectCanvas.width, spectCanvas.height);
+        }
+        
+        function draw() {
+            if (!analyser || audioEl.paused) return;
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+
+            const w = spectCanvas.width;
+            const h = spectCanvas.height;
+            const colWidth = 2;
+
+            // Shift current image left
+            const imageData = spectCtx.getImageData(colWidth, 0, w - colWidth, h);
+            spectCtx.putImageData(imageData, 0, 0);
+
+            // Draw new column on the right
+            const binsToShow = 200; // Concentrate on human voice frequencies
+            const barHeight = h / binsToShow;
+
+            for (let i = 0; i < binsToShow; i++) {
+                const value = dataArray[i];
+                const percent = value / 255;
+                
+                // Color map: Black -> Blue -> Red/Orange -> Yellow
+                const r = Math.floor(255 * Math.pow(percent, 2));
+                const g = Math.floor(255 * Math.max(0, percent - 0.5) * 2);
+                const b = Math.floor(180 * Math.max(0, 1 - Math.pow(percent * 2, 2))); // subtle blue base
+                // Enhance brightness
+                const adjustedB = r === 0 && g === 0 ? Math.floor(200 * percent) : b;
+                
+                spectCtx.fillStyle = `rgb(${r}, ${g}, ${adjustedB})`;
+                spectCtx.fillRect(w - colWidth, h - (i + 1) * barHeight, colWidth, Math.ceil(barHeight));
+            }
+            
+            animFrameId = requestAnimationFrame(draw);
+        }
+        if (!animFrameId) {
+            animFrameId = requestAnimationFrame(draw);
+        }
+    }
+    
+    function stopSpectrogram() {
+        if (animFrameId) {
+            cancelAnimationFrame(animFrameId);
+            animFrameId = null;
+        }
+    }
+
+    if (audioEl) {
+        audioEl.addEventListener('play', startSpectrogram);
+        audioEl.addEventListener('pause', stopSpectrogram);
+        audioEl.addEventListener('ended', stopSpectrogram);
+    }
 });

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Empathy Engine — Emotion-Aware Speech</title>
+    <title>Vaartalaap AI — Emotion-Aware Speech</title>
     <meta name="description" content="Type text, detect its emotion, and hear it spoken with expressive prosody.">
     <link rel="icon" type="image/x-icon" href="/static/assets/favicon.ico">
     <link rel="icon" type="image/png" href="/static/assets/favicon.png">
@@ -14,8 +14,8 @@
     <div class="layout">
 
         <header>
-            <h1>Empathy Engine</h1>
-            <p class="subtitle">
+            <h1 style="text-align: center;">Vaartalaap AI</h1>
+            <p class="subtitle" style="margin: 0.5rem auto;">
                 Detects the emotion behind your words and speaks them with matching vocal expression
                 — rate, pitch, and volume — automatically.
             </p>
@@ -171,7 +171,8 @@
 
                 <!-- Audio -->
                 <div class="audio-block">
-                    <audio id="audio-output" controls></audio>
+                    <canvas id="spectrogram-canvas" width="600" height="100" style="width: 100%; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; background: #0a0a0a; display: block;"></canvas>
+                    <audio id="audio-output" controls crossorigin="anonymous"></audio>
                 </div>
 
                 <!-- SSML preview -->
@@ -184,7 +185,7 @@
         </main>
 
         <footer>
-            <span>Empathy Engine &mdash; Darwix AI &middot; 2026</span>
+            <span>Vaartalaap AI &mdash; Darwix AI &middot; 2026</span>
         </footer>
 
     </div>
