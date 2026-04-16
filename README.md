@@ -1,47 +1,94 @@
-# Empathy Engine
+<div align="center">
+  
+# 🎙️ Vaartalaap AI
+**A Contextual, LLM-Driven Expressive Speech Synthesis Pipeline**
 
-A production-ready full-stack web application designed to analyze the emotional intent of text input and map it directly to voice synthesis parameters (rate, pitch, volume) using SSML.
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-2094f3.svg)
+![Groq](https://img.shields.io/badge/Groq-Cloud-f54242.svg)
+![Architecture](https://img.shields.io/badge/Architecture-Prosody_Aware-success.svg)
 
-## Features
-- **Emotion Recognition**: Analyzes text using HuggingFace Transformers (`distilbert-base-uncased-emotion`), fallback to VADER sentiment rule-engine.
-- **Dynamic Prosody Engine**: Maps detected emotion and scaled intensity directly into voice parameters.
-- **SSML Generation**: Builds compliant SSML with word-level emphasis.
-- **Fallbacks**: Switches from advanced TTS to local `pyttsx3` smoothly if credentials are missing or errors occur.
-- **Minimal UI**: A strict black-and-white, highly professional frontend without flashy design elements.
+</div>
 
-## Architecture
-- **Backend**: FastAPI
-- **Emotion Adapter Layer**: `services.emotion`
-- **TTS Adapter Layer**: `services.tts`
-- **Frontend**: Plain HTML/Vanilla JS with purely functional styling.
+## 📖 Executive Summary
+Vaartalaap AI is a sophisticated Text-to-Speech (TTS) orchestration engine designed to bridge the gap between robotic, monotonic TTS and human-like voice performance. Unlike standard TTS wrappers, Vaartalaap AI treats text generation as a **Speech Performance Pipeline**. 
 
-## Local Setup
+It intelligently analyzes the emotional intent of the text, uses a Large Language Model (LLM) to extract prosodic intent (breath groups, pitch variation, speaking rate), automatically injects SSML (Speech Synthesis Markup Language), and handles complex code-mixed inputs (Hinglish/Hindi) without destructive translation.
 
-1. **Environment Config**
-Copy `.env.example` to `.env` and fill in necessary fields.
-```bash
-cp .env.example .env
-```
+This project was built to demonstrate advanced capabilities in **computational linguistics, conversational AI, and audio engineering pipeline design**—core competencies required for modern Voice AI architectures (comparable to systems at ElevenLabs or Sarvam AI).
 
-2. **Dependencies**
-Install standard pip requirements:
-```bash
-pip install -r requirements.txt
-```
-*(Optionally setup your own venv)*
+---
 
-3. **Run Application**
-Standard Uvicorn run loop:
-```bash
-python -m app.main
-```
-or 
-```bash
-uvicorn app.main:app --reload
-```
+## 🏗️ Architecture & Technology Stack
 
-## Testing
-Run pytest for unit coverage:
-```bash
-pytest tests/
-```
+### 1. Core Framework & Concurrency
+* **FastAPI (Python)**: The backbone of the application. Leverages asynchronous request handling (`asyncio`) to ensure non-blocking HTTP and WebSocket operations.
+* **WebSocket Streaming**: Implements progressive, chunk-by-chunk audio generation and delivery (`app/api/routes/stream.py`). This drastically reduces Time To First Byte (TTFB), allowing the user to hear the opening sentence while the rest of the paragraph is still rendering in the background.
+
+### 2. Speech Planning & Prosody Engine
+* **Groq LLM Engine**: Acts as the "Speech Director." Instead of feeding raw text into a TTS engine, the text is first passed to a low-latency LLM running on Groq. The LLM chunks the text into natural "breath groups," determines emphasis words, and calculates dynamic percentage deltas for rate, pitch, and volume per segment.
+* **SSML Builder** (`app/services/tts/ssml_builder.py`): Dynamically compiles standard text and LLM instructions into rich XML/SSML, applying `<prosody>` and `<break>` tags with micro-millisecond precision.
+
+### 3. Emotion & Language Analysis
+* **HuggingFace Transformers**: Utilizes `j-hartmann/emotion-english-distilroberta-base` for zero-shot text emotion classification, picking up on 7 core human emotions.
+* **VADER Sentiment**: Acts as a robust, lightweight heuristic fallback when the neural model is unavailable or uncertain.
+* **Custom Code-Mixed Language Detector** (`app/services/text/language_detector.py`): Contains a custom script and Romanized Hindi (Hinglish) heuristic classifier. It maps Devanagari, English, and Roman Hindi to enforce strict voice-localization (switching TTS underlying models from `en-US` to `hi-IN` or `en-IN` seamlessly).
+
+### 4. Acoustic Synthesis Engines
+* **Google Cloud TTS**: Utilizes WaveNet/Neural2 architectures.
+* **Microsoft Edge Expressive TTS**: Monkey-patches Edge TTS to aggressively utilize `mstts:express-as` tags, mapping detected emotions (e.g., "grief" or "rage") directly to Azure's neural emotional styles.
+
+### 5. Audio Post-Processing (DSP)
+* **Pydub (FFmpeg)**: Applies post-synthesis Digital Signal Processing (DSP). Depending on the emotional intensity (derived from the NLP pipeline), the engine adjusts the EQ curve, normalizes volume, and splices audio files together.
+
+### 6. Frontend Visualization
+* **Native Web Audio API**: Features a custom-built, zero-dependency real-time spectrogram canvas. Parses byte-frequency data from the `<audio>` node to create a rolling, color-mapped visualization of the generated vocal frequencies.
+
+---
+
+## 🧠 Deep Dive: Key Engineering Logics
+
+### 1. The Zero-Translation Guardrail (Language Preservation)
+A critical challenge in modern LLMs modifying text for "human conversational cadence" is their tendency to translate code-mixed languages (like Hinglish) into standard English. 
+**The Solution:**
+* The `language_detector.py` scans inputs for Devanagari Unicode ranges and a dictionary of high-frequency Roman Hindi words.
+* If a native language is detected, the LLM is injected with a dynamic, highly aggressive system prompt (`_SYSTEM_HINDI_CONSTRAINT`) that strictly prohibits translation, while still allowing the LLM to format the JSON prosody structure.
+* The pipeline routes the output exclusively to localized TTS voices (e.g., `hi-IN-SwaraNeural`), setting the correct `xml:lang` tags.
+
+### 2. Segment-Level Prosody Variation
+Standard TTS sounds robotic because the speaking rate and pitch remain constant for an entire paragraph. 
+**The Solution:**
+* Vaartalaap AI splits a paragraph into logical clauses.
+* The LLM generates a localized delivery arc (e.g., opening segment: standard rate; climax segment: +15% rate, +5st pitch).
+* The backend parses these JSON deltas and converts them into cascading `<prosody>` SSML wrappers. For engines that don't support robust intra-sentence SSML, the application chunks the string, synthesizes them individually via concurrent `asyncio.gather`, and concatenates the resulting MP3 bytes via `pydub`.
+
+### 3. Progressive WebSocket Streaming
+To simulate human-like conversational latency:
+* The `/api/v1/stream` endpoint accepts text over a persistent WebSocket.
+* The backend analyzes the sentences, synthesizes them sequentially, and yields Base64-encoded chunked audio frames back to the client immediately.
+* The frontend buffers and starts playback of chunk `n` while the server is concurrently rendering chunk `n+1`.
+
+---
+
+## 🚀 How to Run Locally
+
+1. **Clone the Repository**
+2. **Environment Variables**: Provide your keys in a `.env` file:
+   ```env
+   GROQ_API_KEY=your_key
+   GOOGLE_APPLICATION_CREDENTIALS=path/to/json
+   HUGGINGFACE_EMOTION_MODEL=j-hartmann/emotion-english-distilroberta-base
+   ```
+3. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   # Ensure FFmpeg is installed and added to the system PATH
+   ```
+4. **Boot Server**:
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+   ```
+
+---
+
+*This project highlights strong product thinking applied to Voice Generative AI—moving beyond direct API wrapping into orchestrating a seamless, emotionally intelligent audio generation pipeline.*
