@@ -119,7 +119,7 @@ The generation pipeline follows a stringent, stateful sequence. Below is the ste
    ```
 4. **Boot Server**:
    ```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+   uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
    ```
 
 ---
