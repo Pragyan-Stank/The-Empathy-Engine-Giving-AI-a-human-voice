@@ -32,7 +32,7 @@ _HINGLISH_WORDS = {
     "tum", "tumko", "tumhara", "tumhari", "aap", "aapka", "aapki", "aapke",
     "woh", "yeh", "uska", "uski", "uske", "iska", "iski", "iske",
     "mera", "meri", "mere", "tera", "teri", "tere", "hamara", "hamari",
-    "unka", "unki", "unke", "inhe", "unhe", "sabka",
+    "unka", "unki", "unke", "inhe", "unhe", "sabka", "naam",
     # Common verbs
     "hai", "hain", "tha", "thi", "the", "hoga", "hogi", "hoge",
     "karo", "karna", "karta", "karti", "karte", "kar", "kiya", "ki",
@@ -100,6 +100,52 @@ _AMBIGUOUS_WORDS = {
     "an", "to", "in", "on", "at", "for", "of", "and", "or", "but",
     "not", "no", "so", "do", "go", "be", "am", "are", "was", "were",
     "has", "have", "had", "will", "can", "may", "did", "got",
+    # Add common English overlaps to prevent false Hinglish detection
+    "mere", "sun", "din", "log", "beta", "bas", "nah", "na", "le", "lo",
+    "de", "se", "ko", "la", "aa", "ab", "ya", "he", "we", "us", "by", "my",
+    "me", "our", "you", "your", "they", "them", "his", "her", "its", "who",
+    "what", "when", "where", "why", "how", "this", "that", "these", "those",
+}
+
+# Unambiguous Hinglish/Hindi words that do not exist in standard English
+_HIGH_CONFIDENCE_HINGLISH_WORDS = {
+    "yaar", "acha", "accha", "lekin", "kyunki", "isliye", "matlab", "naam",
+    "hai", "hain", "tha", "thi", "the", "hoga", "hogi", "hoge",
+    "karo", "karna", "karta", "karti", "karte", "kar", "kiya",
+    "mujhe", "mujhko", "tumhara", "tumhari", "aapka", "aapki", "aapke",
+    "kaise", "kyun", "kyu", "kidhar", "kahan", "sabka", "hamara", "hamari",
+    "unka", "unki", "unke", "inhe", "unhe", "ho", "hona", "hota",
+    "hoti", "hote", "hua", "hui", "hue", "gaya", "gayi", "gaye",
+    "bol", "bolo", "bolna", "bola", "boli", "bole", "dekh", "dekho",
+    "dekhna", "dekha", "dekhi", "dekhe", "suno", "sunna", "suna", "suni",
+    "sune", "samajh", "samjho", "samjhe", "samajhna", "samjha", "samjhi",
+    "baith", "baitho", "baithna", "baitha", "baithi", "baithe",
+    "rakh", "rakho", "rakhna", "rakha", "rakhi", "rakhe",
+    "chalo", "chalna", "chala", "chali", "chale",
+    "ruko", "rukna", "ruka", "ruki", "ruke",
+    "socho", "sochna", "socha", "sochi", "soche",
+    "banao", "banana", "banata", "banati", "banate", "banaya", "banayi",
+    "khao", "khana", "khata", "khati", "khate", "khaya", "khayi",
+    "peena", "peeta", "peete", "piya",
+    "likhna", "likhta", "likhti", "likhte", "likha", "likhi", "likhe",
+    "padhna", "padhta", "padhti", "padhte", "padha", "padhi", "padhe",
+    "milna", "milta", "milti", "milte", "mila", "mili", "mile",
+    "rona", "rota", "roti", "rote", "roya", "royi",
+    "hasna", "hasta", "hasti", "haste", "hasa",
+    "sona", "sota", "soti", "sote", "soya", "soyi",
+    "uthna", "uthta", "uthti", "uthte", "utha", "uthi",
+    "batana", "batata", "batati", "bataya",
+    "puchna", "puchta", "puchti", "pucha", "puchi",
+    "rehna", "rehta", "rehti", "rehte", "raha", "rahi", "rahe",
+    "chahta", "chahti", "chahte", "chaha", "chahi",
+    "pyaar", "zindagi", "duniya", "sapna", "khabar", "paisa", "banda",
+    "ladka", "ladki", "bachcha", "aadmi", "aurat", "bhai", "behen",
+    "papa", "baap", "beti", "didi", "chacha", "mausi",
+    "nana", "nani", "dada", "dadi", "theek", "galat", "mushkil", "aasaan",
+    "zyada", "bohot", "bahut", "thoda", "bilkul", "ekdum", "sacchi", "firse",
+    "phirse", "dubara", "kaisa", "kitna", "kitni", "kitne", "kaun",
+    "kisko", "kiske", "warna", "yaani", "jaise",
+    "arre", "arrey", "oye", "haan", "nahin", "nahi",
 }
 
 
@@ -138,6 +184,7 @@ def detect_language(text: str) -> Tuple[str, float]:
 
     hindi_word_count = 0
     countable_words = 0
+    matched_hinglish_words = set()
 
     for w in words:
         if len(w) < 2:
@@ -147,21 +194,30 @@ def detect_language(text: str) -> Tuple[str, float]:
             continue
         if w in _HINGLISH_WORDS:
             hindi_word_count += 1
+            matched_hinglish_words.add(w)
 
     if countable_words == 0:
         return "en", 1.0
 
     hindi_ratio = hindi_word_count / countable_words
 
+    # Strong Hinglish signal criteria:
+    # 1. Has at least one word from the high-confidence Hinglish list
+    # 2. Or has at least 2 distinct Hinglish words
+    has_high_confidence = any(w in _HIGH_CONFIDENCE_HINGLISH_WORDS for w in matched_hinglish_words)
+    has_multiple_distinct = len(matched_hinglish_words) >= 2
+
     # Thresholds:
-    #   > 0.30 → Hinglish (mix of Hindi and English words written in Roman)
-    #   > 0.15 → Weak Hinglish signal — still treat as Hinglish to be safe
-    if hindi_ratio > 0.30:
+    # If we have a strong Hinglish signal:
+    if (has_high_confidence or has_multiple_distinct) and hindi_ratio > 0.20:
         return "hi-Latn", min(1.0, hindi_ratio + 0.3)
-    elif hindi_ratio > 0.15:
-        return "hi-Latn", hindi_ratio + 0.2
+
+    # If the ratio is very high (e.g. > 0.5), we can classify as Hinglish even if it's a single word
+    if hindi_ratio > 0.50:
+        return "hi-Latn", min(1.0, hindi_ratio + 0.2)
 
     return "en", 1.0 - hindi_ratio
+
 
 
 def is_hindi_or_hinglish(text: str) -> bool:

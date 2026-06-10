@@ -7,7 +7,7 @@ Output format: WAV (pyttsx3 save_to_file on Windows writes WAV).
 import asyncio
 import re
 import xml.etree.ElementTree as ET
-from typing import Dict
+from typing import Dict, Optional
 
 import pyttsx3
 
@@ -61,6 +61,7 @@ class FallbackTTS(TTSEngine):
         prosody: Dict[str, str],
         emotion: str = "neutral",
         segment_deltas: list = None,
+        detected_lang: Optional[str] = None,
     ) -> str:
         wpm = _parse_rate_to_wpm(prosody.get("rate", "default"))
         vol = _parse_volume_to_float(prosody.get("volume", "default"))

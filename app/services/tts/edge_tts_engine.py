@@ -10,7 +10,7 @@ Unit conversions from our internal prosody format:
 """
 import math
 import os
-from typing import Dict
+from typing import Dict, Optional
 
 from app.services.tts.base import TTSEngine
 from app.core.exceptions import TTSGenerationError
@@ -76,6 +76,7 @@ class EdgeTTSEngine(TTSEngine):
         prosody: Dict[str, str],
         emotion: str = "neutral",
         segment_deltas: list = None,
+        detected_lang: Optional[str] = None,
     ) -> str:
         if not self.available:
             raise TTSGenerationError("edge-tts library not installed.")

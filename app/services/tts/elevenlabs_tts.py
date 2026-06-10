@@ -12,7 +12,7 @@ API key: read from settings.ELEVEN_LABS (env var: ELEVEN_LABS)
 """
 import os
 import asyncio
-from typing import Dict
+from typing import Dict, Optional
 
 try:
     from elevenlabs.client import ElevenLabs
@@ -89,6 +89,7 @@ class ElevenLabsTTS(TTSEngine):
         prosody: Dict[str, str],
         emotion: str = "neutral",
         segment_deltas: list = None,
+        detected_lang: Optional[str] = None,
     ) -> str:
         if not self.available:
             raise TTSGenerationError("ElevenLabs not available.")
@@ -136,6 +137,6 @@ class ElevenLabsTTS(TTSEngine):
             if any(x in err.lower() for x in ("401", "403", "unusual", "disabled", "unauthorized")):
                 self.available = False
                 logger.warning(
-                    f"ElevenLabs permanently disabled for this session: {err[:250]}"
+                    f"ElevenLabs permanently disabled for this session: {err[:500]}"
                 )
-            raise TTSGenerationError(f"ElevenLabs SDK error: {err[:300]}")
+            raise TTSGenerationError(f"ElevenLabs SDK error: {err[:600]}")

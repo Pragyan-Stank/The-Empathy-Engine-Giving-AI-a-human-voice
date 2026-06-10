@@ -181,7 +181,7 @@ def _parse_volume(vol_str: str) -> float:
         return 0.0
 
 
-def _detect_text_language(text: str) -> Tuple[str, str, Dict, Tuple]:
+def _detect_text_language(text: str, detected_lang: Optional[str] = None) -> Tuple[str, str, Dict, Tuple]:
     """
     Detect language and return (lang_code, lang_tag, voice_map, default_voice).
 
@@ -191,7 +191,14 @@ def _detect_text_language(text: str) -> Tuple[str, str, Dict, Tuple]:
         voice_map: appropriate voice map dict
         default_voice: appropriate default voice tuple
     """
-    lang, confidence = detect_language(text)
+    if detected_lang is not None:
+        lang = detected_lang
+        # If we have a detected language, we can run detect_language to get confidence if needed,
+        # or mock confidence. Let's just run it to get the confidence score for voice routing.
+        _, confidence = detect_language(text)
+    else:
+        lang, confidence = detect_language(text)
+
     if lang == "hi":
         return "hi-IN", lang, _HINDI_VOICE_MAP, _DEFAULT_HINDI_VOICE
     elif lang == "hi-Latn":
@@ -235,6 +242,7 @@ class GoogleCloudTTS(TTSEngine):
         prosody: Dict[str, str],
         emotion: str = "neutral",
         segment_deltas: list = None,
+        detected_lang: Optional[str] = None,
     ) -> str:
         if not self.available:
             raise TTSGenerationError("Google TTS API key not configured.")
@@ -243,7 +251,7 @@ class GoogleCloudTTS(TTSEngine):
             filepath = filepath.rsplit(".", 1)[0] + ".mp3"
 
         # Detect language and select voice map accordingly
-        lang_code, lang_tag, voice_map, default_voice = _detect_text_language(text)
+        lang_code, lang_tag, voice_map, default_voice = _detect_text_language(text, detected_lang=detected_lang)
 
         if lang_tag in ("hi", "hi-Latn"):
             logger.info(

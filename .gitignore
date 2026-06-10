@@ -1,3 +1,44 @@
-\venv
+# Byte-compiled / optimized / DLL files
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Environments
 .env
-nltk_data
+.env.*
+.venv/
+venv/
+ENV/
+env/
+venv.bak/
+env.bak/
+
+# Logs
+*.log
+uvicorn.log
+uvicorn_err.log
+
+# Project specific
+nltk_data/
+output_audio/
+
+# Unit test / coverage reports
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# VS Code / IDE settings
+.vscode/
+.idea/
+.DS_Store

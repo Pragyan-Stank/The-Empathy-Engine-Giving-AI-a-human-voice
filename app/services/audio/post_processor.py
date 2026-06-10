@@ -23,14 +23,18 @@ import os
 import math
 import logging
 import shutil
+import warnings
 from typing import Optional
 
 
 logger = logging.getLogger("empathy_engine")
 
 try:
-    from pydub import AudioSegment
-    from pydub.effects import normalize, compress_dynamic_range
+    # Suppress pydub's RuntimeWarning about ffmpeg — we check for it ourselves below.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        from pydub import AudioSegment
+        from pydub.effects import normalize, compress_dynamic_range
     # pydub requires the ffmpeg/ffprobe binary to handle MP3 files.
     # Check once at startup rather than crashing per-request.
     _ffmpeg_path = shutil.which("ffmpeg") or shutil.which("ffprobe")

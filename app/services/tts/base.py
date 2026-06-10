@@ -12,6 +12,7 @@ class TTSEngine(ABC):
         prosody: Dict[str, str],
         emotion: str = "neutral",
         segment_deltas: list = None,
+        detected_lang: Optional[str] = None,
     ) -> str:
         """
         Synthesize audio and save to filepath. Return the saved filepath.

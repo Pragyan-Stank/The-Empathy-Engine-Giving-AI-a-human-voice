@@ -97,6 +97,10 @@ async def stream_speech(websocket: WebSocket):
             intensity = float(request.get("intensity", 1.0))
 
             try:
+                # ── Step 0: Language Detection ─────────────────────────────
+                input_lang, lang_confidence = detect_language(text)
+                is_hindi = input_lang in ("hi", "hi-Latn")
+
                 # ── Step 1: Emotion Detection ──────────────────────────────
                 if emotion_override:
                     emotion_label = emotion_override.lower()
@@ -115,7 +119,10 @@ async def stream_speech(websocket: WebSocket):
 
                 # ── Step 2: LLM Speech Analysis ───────────────────────────
                 prosody = calculate_prosody(emotion_label, intensity)
-                speech_analysis = await analyze_speech(text, emotion_label, intensity)
+                speech_analysis = await analyze_speech(
+                    text, emotion_label, intensity,
+                    detected_lang=input_lang,
+                )
 
                 await websocket.send_json({
                     "type": "metadata",
@@ -126,19 +133,8 @@ async def stream_speech(websocket: WebSocket):
                     "status": "generating",
                 })
 
-                # ── Step 3: Text Enhancement ──────────────────────────────
-                # Language-safety: never use LLM-rewritten text for Hindi/Hinglish
-                input_lang, _ = detect_language(text)
-                is_hindi = input_lang in ("hi", "hi-Latn")
-
-                SHORT_TEXT_LIMIT = 600
-                if (speech_analysis.llm_used
-                    and speech_analysis.humanized_text
-                    and len(text) <= SHORT_TEXT_LIMIT
-                    and not is_hindi):
-                    base_for_tts = speech_analysis.humanized_text
-                else:
-                    base_for_tts = text
+                # ── Step 3: Text (always use original input, no LLM rewriting) ─
+                base_for_tts = text  # Never use humanized_text — it can translate
 
                 enhanced_text = enhance_text(
                     base_for_tts, emotion_label, intensity,
@@ -191,12 +187,14 @@ async def stream_speech(websocket: WebSocket):
                                 sentence, seg_ssml, seg_filepath,
                                 seg_prosody, emotion=seg_emotion,
                                 segment_deltas=[delta] if delta else None,
+                                detected_lang=input_lang,
                             )
                         elif _edge_tts.available:
                             actual_path = await _edge_tts.synthesize(
                                 sentence, seg_ssml, seg_filepath,
                                 prosody, emotion=seg_emotion,
                                 segment_deltas=[delta] if delta else None,
+                                detected_lang=input_lang,
                             )
                         else:
                             continue

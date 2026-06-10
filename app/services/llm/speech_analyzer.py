@@ -21,7 +21,7 @@ This module simulates how a skilled voice actor PREPARES to deliver text:
      - rate:   ±20%  (dynamic range for real expressiveness)
      - pitch:  ±10Hz (noticeable intonation shifts)
      - volume: ±4dB  (energy variation)
-     - pause:  0–900ms (breathing, dramatic pauses, hesitation)
+     - pause:  0-900ms (breathing, dramatic pauses, hesitation)
 
   4. Identify emphasis words for <emphasis> injection in SSML
 
@@ -193,6 +193,7 @@ async def analyze_speech(
     text: str,
     emotion: str = "neutral",
     intensity: float = 1.0,
+    detected_lang: Optional[str] = None,
 ) -> SpeechAnalysis:
     """
     Run Groq LLM analysis. Falls back gracefully if API is unavailable.
@@ -206,7 +207,12 @@ async def analyze_speech(
         return _fallback(text, emotion, "No GROQ_API_KEY in .env")
 
     # Detect input language to drive prompt behaviour
-    lang, lang_conf = detect_language(text)
+    if detected_lang is not None:
+        lang = detected_lang
+        lang_conf = 1.0
+    else:
+        lang, lang_conf = detect_language(text)
+
     lang_label = {
         "hi": "Hindi (Devanagari)",
         "hi-Latn": "Hinglish (Romanized Hindi)",

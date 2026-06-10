@@ -46,6 +46,7 @@ from app.services.text.text_enhancer import enhance_text
 from app.services.tts.ssml_builder import SSMLBuilder
 from app.services.tts.elevenlabs_tts import ElevenLabsTTS
 from app.services.tts.google_tts import GoogleCloudTTS
+from app.services.tts.groq_tts import GroqOrpheusTTS
 from app.services.tts.expressive_edge_tts import ExpressiveEdgeTTS
 from app.services.tts.edge_tts_engine import EdgeTTSEngine
 from app.services.tts.fallback_tts import FallbackTTS
@@ -64,6 +65,7 @@ _ssml_builder  = SSMLBuilder()
 _storage       = AudioStorageService()
 _elevenlabs      = ElevenLabsTTS()
 _google_tts      = GoogleCloudTTS()
+_groq_orpheus    = GroqOrpheusTTS()          # Orpheus English (Groq playai-tts)
 _expressive_edge = ExpressiveEdgeTTS()   # Primary free: emotion voice styles
 _edge_tts        = EdgeTTSEngine()       # Fallback free: rate/pitch/volume only
 _pyttsx3_tts     = FallbackTTS()         # Offline: SAPI5 (rate + volume)
@@ -94,6 +96,7 @@ async def _synthesize_audio(
     prosody: dict,
     emotion: str,
     segment_deltas: list = None,
+    detected_lang: str = None,
 ) -> str:
     """Try providers in priority order; return actual saved filepath."""
 
@@ -101,7 +104,8 @@ async def _synthesize_audio(
     if _elevenlabs.available:
         try:
             return await _elevenlabs.synthesize(
-                text, engine_ssml, filepath, prosody, emotion=emotion
+                text, engine_ssml, filepath, prosody, emotion=emotion,
+                detected_lang=detected_lang,
             )
         except TTSGenerationError as e:
             logger.error(f"ElevenLabs failed ({e}). Trying Google TTS.")
@@ -112,17 +116,30 @@ async def _synthesize_audio(
             return await _google_tts.synthesize(
                 text, engine_ssml, filepath, prosody, emotion=emotion,
                 segment_deltas=segment_deltas,
+                detected_lang=detected_lang,
             )
         except TTSGenerationError as e:
-            logger.error(f"Google TTS failed ({e}). Trying Expressive Edge TTS.")
+            logger.error(f"Google TTS failed ({e}). Trying Groq Orpheus TTS.")
 
-    # 3 — Expressive Edge TTS (emotion voice styles + prosody curves from LLM)
+    # 3 — Groq Orpheus TTS (playai-tts — emotion-mapped voices)
+    if _groq_orpheus.available:
+        groq_path = os.path.splitext(filepath)[0] + ".mp3"
+        try:
+            return await _groq_orpheus.synthesize(
+                text, engine_ssml, groq_path, prosody, emotion=emotion,
+                detected_lang=detected_lang,
+            )
+        except TTSGenerationError as e:
+            logger.error(f"Groq Orpheus TTS failed ({e}). Trying Expressive Edge TTS.")
+
+    # 4 — Expressive Edge TTS (emotion voice styles + prosody curves from LLM)
     if _expressive_edge.available:
         edge_path = os.path.splitext(filepath)[0] + ".mp3"
         try:
             return await _expressive_edge.synthesize(
                 text, engine_ssml, edge_path, prosody, emotion=emotion,
                 segment_deltas=segment_deltas or [],
+                detected_lang=detected_lang,
             )
         except TTSGenerationError as e:
             logger.error(f"Expressive Edge TTS failed ({e}). Trying basic Edge TTS.")
@@ -132,7 +149,8 @@ async def _synthesize_audio(
         edge_path = os.path.splitext(filepath)[0] + ".mp3"
         try:
             return await _edge_tts.synthesize(
-                text, engine_ssml, edge_path, prosody, emotion=emotion
+                text, engine_ssml, edge_path, prosody, emotion=emotion,
+                detected_lang=detected_lang,
             )
         except TTSGenerationError as e:
             logger.error(f"Basic Edge TTS failed ({e}). Falling back to pyttsx3.")
@@ -140,7 +158,8 @@ async def _synthesize_audio(
     # 5 — pyttsx3 offline (rate + volume only)
     wav_path = os.path.splitext(filepath)[0] + ".wav"
     return await _pyttsx3_tts.synthesize(
-        text, engine_ssml, wav_path, prosody, emotion=emotion
+        text, engine_ssml, wav_path, prosody, emotion=emotion,
+        detected_lang=detected_lang,
     )
 
 
@@ -210,7 +229,8 @@ async def synthesize_speech(request: SynthesizeRequest):
         # Also provides: delivery_style, tone_arc, intent for downstream processing.
         # Falls back gracefully (<6s timeout) so synthesis is never blocked.
         speech_analysis: SpeechAnalysis = await analyze_speech(
-            clean_text, emotion_label, request.intensity
+            clean_text, emotion_label, request.intensity,
+            detected_lang=input_lang,
         )
         logger.info(
             f"Speech analysis: llm={speech_analysis.llm_used}, "
@@ -241,44 +261,11 @@ async def synthesize_speech(request: SynthesizeRequest):
                 f"emotions: {unique_emotions}"
             )
 
-        # Step 7 — Text Enhancement (punctuation injection + chunking + Indian rhythm)
-        # CRITICAL: Always use FULL clean_text as the TTS source.
-        # LLM humanized_text is capped at 1200 chars by the token budget —
-        # using it for long texts silently drops everything after ~1200 chars.
-        # LLM value for long texts = segment_deltas + emphasis_words, NOT text rewriting.
-        #
-        # LANGUAGE SAFETY: For Hindi/Hinglish input, ALWAYS prefer the original
-        # clean_text. The LLM might still translate despite strong prompt constraints.
-        # We only trust the LLM's humanized output for English text.
-        SHORT_TEXT_LIMIT = 800  # increased from 600 — LLM now has more token budget
-        if (
-            speech_analysis.llm_used
-            and speech_analysis.humanized_text
-            and len(clean_text) <= SHORT_TEXT_LIMIT
-            and not is_hindi  # NEVER use LLM-rewritten text for Hindi/Hinglish
-        ):
-            base_for_tts = speech_analysis.humanized_text
-            logger.info(f"Using LLM-humanized text ({len(base_for_tts)} chars)")
-        else:
-            base_for_tts = clean_text
-            if is_hindi:
-                logger.info(
-                    f"Hindi/Hinglish input — using original text to prevent translation; "
-                    "LLM prosody deltas + emphasis still applied"
-                )
-            elif speech_analysis.llm_used and len(clean_text) > SHORT_TEXT_LIMIT:
-                logger.info(
-                    f"Long text ({len(clean_text)} chars) — using full clean_text; "
-                    "LLM prosody deltas + emphasis still applied"
-                )
-
-        enhanced_text = enhance_text(
-            base_for_tts, emotion_label, request.intensity,
-            tone_arc=speech_analysis.tone_arc,
-        )
-        tts_text = re.sub(r"(?<=[.!?,])\s*\|\|\d+ms\|\|\s*", " ", enhanced_text)
-        tts_text = re.sub(r"\|\|\d+ms\|\|", ", ", tts_text).strip()
-        logger.info(f"Text enhanced: {len(clean_text)}→{len(tts_text)} chars")
+        # Step 7 — Always use the original input text, unchanged.
+        # LLM humanized_text is deliberately ignored — it can translate or modify the input.
+        # The LLM is only used for prosody deltas (rate/pitch/volume per segment).
+        tts_text = clean_text
+        logger.info(f"Using original text as-is ({len(tts_text)} chars)")
 
         # Collect LLM emphasis words and segment deltas for downstream use
         segment_deltas = [
@@ -297,10 +284,10 @@ async def synthesize_speech(request: SynthesizeRequest):
 
         # Step 8 — SSML generation (emotion-aware + LLM emphasis words)
         engine_ssml  = _ssml_builder.build_ssml_engine(
-            enhanced_text, prosody, emotion_label, extra_emphasis=llm_emphasis
+            tts_text, prosody, emotion_label, extra_emphasis=llm_emphasis
         )
         display_ssml = _ssml_builder.build_ssml_display(
-            enhanced_text, prosody, emotion_label, extra_emphasis=llm_emphasis
+            tts_text, prosody, emotion_label, extra_emphasis=llm_emphasis
         )
 
         # Step 9 — Cache key (prosody + emotion breakdown)
@@ -318,6 +305,7 @@ async def synthesize_speech(request: SynthesizeRequest):
             final_path = await _synthesize_audio(
                 tts_text, engine_ssml, base_filepath, prosody, emotion_label,
                 segment_deltas=segment_deltas,
+                detected_lang=input_lang,
             )
             logger.info(f"Audio saved: {final_path}")
 

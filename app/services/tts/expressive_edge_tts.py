@@ -249,10 +249,12 @@ class ExpressiveEdgeTTS(TTSEngine):
                 _ctx_xml_lang.reset(tok_lang)
                 if "No audio was received" in str(exc) and attempt == 0:
                     logger.warning(
-                        f"ExpressiveEdgeTTS: 'No audio received' for [{emotion}] "
-                        f"(rate={rate} pitch={pitch}) — retrying once..."
+                        f"ExpressiveEdgeTTS: express-as style '{style}' rejected "
+                        f"for [{emotion}] (rate={rate} pitch={pitch}) — "
+                        f"retrying without style tag..."
                     )
-                    continue  # retry with SAME prosody (transient error)
+                    style = None  # Drop mstts:express-as on retry — plain prosody always works
+                    continue
                 raise
             finally:
                 try:
@@ -271,6 +273,7 @@ class ExpressiveEdgeTTS(TTSEngine):
         prosody: Dict[str, str],
         emotion: str = "neutral",
         segment_deltas: List[Dict] = None,
+        detected_lang: Optional[str] = None,
     ) -> str:
         # Safety: strip any ||Xms|| pause markers that weren't converted upstream
         text = _PAUSE_MARKER_RE.sub(", ", text).strip()
@@ -279,7 +282,12 @@ class ExpressiveEdgeTTS(TTSEngine):
             filepath = os.path.splitext(filepath)[0] + ".mp3"
 
         # ── Detect input language ────────────────────────────────────────────
-        lang, lang_conf = detect_language(text)
+        if detected_lang is not None:
+            lang = detected_lang
+            lang_conf = 1.0
+        else:
+            lang, lang_conf = detect_language(text)
+
         use_hindi = lang in ("hi", "hi-Latn")
         if use_hindi:
             logger.info(
