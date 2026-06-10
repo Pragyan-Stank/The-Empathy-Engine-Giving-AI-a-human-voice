@@ -25,9 +25,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.config import settings
 from app.core.logging_config import logger
-from app.services.emotion.transformer_model import TransformerEmotionAnalyzer
 from app.services.emotion.sentiment_fallback import VaderSentimentFallback
-from app.services.emotion.granular import refine_emotion
 from app.services.emotion.intensity import calculate_prosody
 from app.services.emotion.sentence_analysis import (
     analyze_text, build_emotion_breakdown, split_sentences, detect_sentence_emotion
@@ -44,24 +42,10 @@ from app.services.text.language_detector import detect_language, is_hindi_or_hin
 router = APIRouter()
 
 # Service singletons (shared with main synthesize route)
-_transformer   = TransformerEmotionAnalyzer(settings.HUGGINGFACE_EMOTION_MODEL)
 _vader         = VaderSentimentFallback()
 _ssml_builder  = SSMLBuilder()
 _google_tts    = GoogleCloudTTS()
 _edge_tts      = ExpressiveEdgeTTS()
-
-
-def _detect_emotion(text: str):
-    """Emotion detection with transformer → VADER fallback chain."""
-    if settings.USE_TRANSFORMERS_MODEL:
-        try:
-            label, confidence = _transformer.analyze(text)
-            if confidence >= 0.15:
-                return label, confidence
-        except Exception:
-            pass
-    label, confidence = _vader.analyze(text)
-    return label, confidence
 
 
 @router.websocket("/stream")
@@ -101,13 +85,17 @@ async def stream_speech(websocket: WebSocket):
                 input_lang, lang_confidence = detect_language(text)
                 is_hindi = input_lang in ("hi", "hi-Latn")
 
-                # ── Step 1: Emotion Detection ──────────────────────────────
-                if emotion_override:
-                    emotion_label = emotion_override.lower()
-                    confidence = 1.0
-                else:
-                    base_emotion, confidence = _detect_emotion(text)
-                    emotion_label = refine_emotion(text, base_emotion)
+                # ── Step 1: LLM Speech Analysis (emotion + segments) ──
+                speech_analysis = await analyze_speech(
+                    text,
+                    emotion_override=emotion_override,
+                    intensity=intensity,
+                    detected_lang=input_lang,
+                )
+
+                emotion_label = speech_analysis.detected_emotion
+                confidence    = speech_analysis.confidence
+                prosody       = calculate_prosody(emotion_label, intensity)
 
                 # Send emotion metadata immediately
                 await websocket.send_json({
@@ -116,13 +104,6 @@ async def stream_speech(websocket: WebSocket):
                     "confidence": round(confidence, 2),
                     "status": "analyzing",
                 })
-
-                # ── Step 2: LLM Speech Analysis ───────────────────────────
-                prosody = calculate_prosody(emotion_label, intensity)
-                speech_analysis = await analyze_speech(
-                    text, emotion_label, intensity,
-                    detected_lang=input_lang,
-                )
 
                 await websocket.send_json({
                     "type": "metadata",
@@ -133,8 +114,8 @@ async def stream_speech(websocket: WebSocket):
                     "status": "generating",
                 })
 
-                # ── Step 3: Text (always use original input, no LLM rewriting) ─
-                base_for_tts = text  # Never use humanized_text — it can translate
+                # ── Step 2: Text (always use original input) ──
+                base_for_tts = text
 
                 enhanced_text = enhance_text(
                     base_for_tts, emotion_label, intensity,
